@@ -4,8 +4,7 @@ import requests
 import os
 import random
 import re
-import json
-from datetime import datetime
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -18,545 +17,397 @@ GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 # 👑 IDENTITÉ PRESTIGIEUSE
 CREATOR = "👑 Soszoe"
 BOT_NAME = "🔥 KervensAI Ultra"
-VERSION = "✨ Édition Diamant"
+VERSION = "✨ Édition Exclusive"
 
-# 🎨 GALERIE EXCLUSIVE - IMAGES HAUTE DÉFINITION
+# 🎨 TES PHOTOS PERSONNELLES - Remplace ces URLs par tes propres images
 IMAGE_GALLERY = [
-    "https://i.imgur.com/7QZ4y8a.jpg",  # Bannière futuriste
-    "https://i.imgur.com/5V2p9X3.jpg",  # Design néon
-    "https://i.imgur.com/9R8c1L2.jpg",  # Interface holographique
-    "https://i.imgur.com/3M7n2qJ.jpg",  # Code matrix
-    "https://i.imgur.com/2K5b8wL.jpg",  # AI vision
-    "https://i.imgur.com/6J4t9vR.jpg",  # Cyber espace
-    "https://i.imgur.com/4H8p2qM.jpg",  # Data flow
-    "https://i.imgur.com/1P9r3nL.jpg"   # Quantum computing
+    "https://files.catbox.moe/601u5z.jpg",  # Remplace avec ton image 1
+    "https://files.catbox.moe/qmxfpk.jpg",  # Remplace avec ton image 2  
+    "https://files.catbox.moe/77iazb.jpg",  # Remplace avec ton image 3
+    "https://files.catbox.moe/tta6ta.jpg",  # Remplace avec ton image 4
+    "https://files.catbox.moe/tta6ta.jpg",  # Remplace avec ton image 5
 ]
 
-# ⚡ MODÈLES ULTRA-PERFORMANTS
+# ⚡ MODÈLES OPTIMISÉS
 MODEL_CONFIG = {
     "🚀 Llama-70B": "llama-3.1-70b-versatile",
     "⚡ Llama-8B": "llama-3.1-8b-instant", 
-    "🎯 Mixtral": "mixtral-8x7b-32768",
-    "💎 Gemma2": "gemma2-9b-it",
-    "🌟 DeepSeek": "deepseek-r1-distill-llama-70b"
+    "🎯 Mixtral": "mixtral-8x7b-32768"
 }
 
-current_model = MODEL_CONFIG["🚀 Llama-70B"]
+current_model = MODEL_CONFIG["⚡ Llama-8B"]  # Modèle plus rapide par défaut
 
-# ==================== FONCTIONS PRESTIGIEUSES ====================
-def create_animated_menu():
-    """Menu animé avec effets visuels"""
-    return f"""
-╔══════════════════════════════════════╗
-║              {BOT_NAME}              ║
-║           {VERSION}           ║
-╠══════════════════════════════════════╣
-║ 🎇  CRÉATEUR : {CREATOR}           ║
-║ 🔥  MODÈLE : {current_model.split('-')[0]}     ║
-║ 💫  STATUT : OPÉRATIONNEL ULTRA     ║
-╠══════════════════════════════════════╣
-║           🎛️  COMMANDES PRINCIPALES          ║
-║ • /start - Menu d'accueil prestige   ║
-║ • /menu - Interface complète         ║
-║ • /code - Génération de code pro     ║
-║ • /gallery - Galerie exclusive       ║
-║ • /models - Technologies AI          ║
-║ • /status - Diagnostic avancé        ║
-║ • /help - Guide ultime               ║
-╠══════════════════════════════════════╣
-║        🚀  FONCTIONNALITÉS ELITE         ║
-║ • Génération de code parfait         ║
-║ • Interface holographique            ║
-║ • Réponses instantanées              ║
-║ • Design néon futuriste              ║
-║ • Support 24/7/365                   ║
-╚══════════════════════════════════════╝
-"""
-
-def create_code_response(text, code_blocks):
-    """Formatage élégant pour le code"""
-    response = "✨ **CODE GÉNÉRÉ AVEC PRÉCISION** ✨\n\n"
+# ==================== FONCTIONS AMÉLIORÉES ====================
+def test_groq_connection():
+    """Test robuste de la connexion Groq"""
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
     
-    if code_blocks:
-        for i, code in enumerate(code_blocks, 1):
-            language = "python"  # Détection automatique du langage
-            if "html" in text.lower():
-                language = "html"
-            elif "css" in text.lower():
-                language = "css"
-            elif "javascript" in text.lower() or "js" in text.lower():
-                language = "javascript"
-            elif "java" in text.lower():
-                language = "java"
-            
-            response += f"📦 **Bloc de code #{i}**\n"
-            response += f"```{language}\n{code.strip()}\n```\n"
-            response += "🎯 **Copie instantanée** - Sélectionnez et copiez\n"
-            response += "⚡ **Optimisé pour performance**\n"
-            response += "🔧 **Prêt à l'emploi**\n\n"
-    
-    response += f"💡 **Conseil du maître** : Utilisez /code pour plus de générations\n"
-    response += f"👑 **Développé par {CREATOR}**\n"
-    
-    return response
-
-def send_animated_message(chat_id, text, delay=0.5):
-    """Envoi de message avec effet d'animation"""
-    messages = [
-        "🎇 Initialisation du système...",
-        "🚀 Chargement des modules IA...", 
-        "💫 Optimisation des performances...",
-        f"✨ {text}"
-    ]
-    
-    for msg in messages:
-        bot.send_chat_action(chat_id, 'typing')
-        import time
-        time.sleep(delay)
-        if msg == messages[-1]:  # Dernier message
-            bot.send_message(chat_id, msg, parse_mode='Markdown')
-
-# ==================== COMMANDES PRESTIGIEUSES ====================
-@bot.message_handler(commands=['start', 'menu', 'accueil'])
-def start_handler(message):
-    """Menu d'accueil ultra premium"""
-    bot.send_chat_action(message.chat.id, 'upload_photo')
-    
-    # Envoi d'une image aléatoire de haute qualité
-    premium_image = random.choice(IMAGE_GALLERY)
+    payload = {
+        "messages": [{"role": "user", "content": "Test"}],
+        "model": current_model,
+        "max_tokens": 10,
+        "temperature": 0.1
+    }
     
     try:
-        bot.send_photo(
-            message.chat.id,
-            photo=premium_image,
-            caption=f"🎨 **{BOT_NAME}** - Interface Premium\n{VERSION}",
-            parse_mode='Markdown'
-        )
+        response = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=10)
+        return response.status_code == 200
     except:
-        pass
-    
-    # Menu animé
-    menu_text = create_animated_menu()
-    bot.send_message(message.chat.id, menu_text, parse_mode='Markdown')
-    
-    # Message de bienvenue
-    welcome_msg = f"""
-🌟 **BIENVENUE DANS L'EXPÉRIENCE ULTRA** 🌟
+        return False
 
-Cher utilisateur, vous venez d'accéder à la version la plus avancée de {BOT_NAME}.
+def create_stylish_menu():
+    """Menu stylisé avec tes photos"""
+    return f"""
+🎊 **{BOT_NAME}** 🎊
+{VERSION}
 
-🎯 **VOS SUPER-POUVOIRS :**
-• 🚀 Génération de code instantanée
-• 💎 Réponses AI ultra-précises  
-• 🎨 Interface design exclusive
-• ⚡ Vitesse de traitement maximale
-• 🔮 Intelligence artificielle elite
+🤖 **Assistant Personnel de {CREATOR}**
+⚡ **Optimisé pour la vitesse et la performance**
 
-👑 **DÉVELOPPÉ PAR :** {CREATOR}
-💫 **VERSION :** {VERSION}
-🕒 **ACCÈS :** Illimité 24/7
+📸 **Galerie Exclusive** - {len(IMAGE_GALLERY)} photos personnelles
+🧠 **IA Avancée** - Réponses intelligentes et rapides
+💻 **Génération de Code** - Code parfait et copiable
 
-💡 **Pour commencer :** Tapez simplement votre demande ou utilisez /code pour du code parfait !
-    """
-    
-    bot.send_message(message.chat.id, welcome_msg, parse_mode='Markdown')
+🎯 **Commandes Disponibles :**
+/start - Menu principal avec photo
+/menu - Interface complète  
+/gallery - Voir toutes mes photos
+/code - Générer du code professionnel
+/models - Gérer les modèles IA
+/quick - Mode réponse rapide
+/photo - Photo aléatoire
 
-@bot.message_handler(commands=['gallery', 'galerie', 'photos'])
-def gallery_handler(message):
-    """Galerie d'art numérique exclusive"""
+🚀 **Pour commencer :** Envoie un message ou utilise /quick pour des réponses ultra-rapides
+
+👑 **Développé avec passion par {CREATOR}**
+"""
+
+def send_photo_with_retry(chat_id, photo_url, caption, max_retries=3):
+    """Envoi de photo avec système de retry"""
+    for attempt in range(max_retries):
+        try:
+            bot.send_photo(chat_id, photo=photo_url, caption=caption, parse_mode='Markdown')
+            return True
+        except Exception as e:
+            if attempt == max_retries - 1:
+                bot.send_message(chat_id, f"📸 **Photo non disponible**\n\nLien direct : {photo_url}", parse_mode='Markdown')
+                return False
+            time.sleep(1)
+    return False
+
+# ==================== COMMANDES OPTIMISÉES ====================
+@bot.message_handler(commands=['start', 'menu'])
+def start_handler(message):
+    """Menu principal avec tes photos"""
     bot.send_chat_action(message.chat.id, 'upload_photo')
     
-    gallery_intro = """
-🎨 **GALERIE D'ART NUMÉRIQUE EXCLUSIVE**
-
-Découvrez nos créations visuelles uniques, spécialement conçues pour l'expérience {BOT_NAME}.
-
-🖼️ **Collection Premium :**
-• Designs futuristes
-• Interfaces holographiques  
-• Art numérique IA
-• Visualisations data
-• Concepts cyberpunk
-
-🌟 **Prévisualisation de la collection...**
-    """
+    # Envoi d'une de tes photos
+    if IMAGE_GALLERY:
+        your_photo = random.choice(IMAGE_GALLERY)
+        photo_caption = f"🎨 **Photo Exclusive**\n\n👑 Propriétaire : {CREATOR}\n🤖 Assistant : {BOT_NAME}\n💫 Collection personnelle"
+        
+        send_photo_with_retry(message.chat.id, your_photo, photo_caption)
     
-    bot.send_message(message.chat.id, gallery_intro, parse_mode='Markdown')
-    
-    # Envoi de 3 images aléatoires de la galerie
-    preview_images = random.sample(IMAGE_GALLERY, min(3, len(IMAGE_GALLERY)))
-    for img in preview_images:
-        try:
-            bot.send_photo(
-                message.chat.id,
-                photo=img,
-                caption="🎨 Œuvre exclusive - Collection KervensAI Ultra",
-                parse_mode='Markdown'
-            )
-        except:
-            continue
+    # Menu stylisé
+    menu_text = create_stylish_menu()
+    bot.send_message(message.chat.id, menu_text, parse_mode='Markdown')
 
-@bot.message_handler(commands=['code', 'coder', 'programmation'])
-def code_handler(message):
-    """Mode génération de code élite"""
+@bot.message_handler(commands=['gallery', 'photos', 'mesphotos'])
+def gallery_handler(message):
+    """Affiche toutes tes photos"""
+    bot.send_chat_action(message.chat.id, 'upload_photo')
+    
+    if not IMAGE_GALLERY:
+        bot.send_message(message.chat.id, "📸 **Aucune photo configurée**\n\nAjoute tes URLs dans IMAGE_GALLERY", parse_mode='Markdown')
+        return
+    
+    gallery_info = f"""
+📸 **MA GALERIE PERSONNELLE**
+
+👑 **Propriétaire :** {CREATOR}
+🖼️ **Total de photos :** {len(IMAGE_GALLERY)}
+🎨 **Collection exclusive**
+
+**Navigation :**
+/photo - Photo aléatoire
+/start - Retour au menu
+"""
+    bot.send_message(message.chat.id, gallery_info, parse_mode='Markdown')
+    
+    # Envoi de 2 photos en preview
+    preview_photos = random.sample(IMAGE_GALLERY, min(2, len(IMAGE_GALLERY)))
+    for photo in preview_photos:
+        send_photo_with_retry(message.chat.id, photo, f"📸 Photo de {CREATOR}", parse_mode='Markdown')
+
+@bot.message_handler(commands=['photo', 'random'])
+def photo_handler(message):
+    """Envoie une photo aléatoire"""
+    bot.send_chat_action(message.chat.id, 'upload_photo')
+    
+    if IMAGE_GALLERY:
+        random_photo = random.choice(IMAGE_GALLERY)
+        caption = f"📸 **Photo Aléatoire**\n\n👑 Propriétaire : {CREATOR}\n🤖 Partagé par {BOT_NAME}\n💫 Collection personnelle"
+        send_photo_with_retry(message.chat.id, random_photo, caption)
+    else:
+        bot.send_message(message.chat.id, "❌ **Aucune photo disponible**\n\nConfigure tes URLs dans le code.", parse_mode='Markdown')
+
+@bot.message_handler(commands=['quick', 'rapide'])
+def quick_handler(message):
+    """Mode réponse rapide avec modèle optimisé"""
     bot.send_chat_action(message.chat.id, 'typing')
     
-    code_menu = f"""
-💻 **MODE GÉNÉRATION DE CODE ELITE** 💻
+    quick_info = """
+🚀 **MODE RAPIDE ACTIVÉ**
 
-🚀 **Technologies supportées :**
-• 🌐 HTML5 / CSS3 / JavaScript
-• 🐍 Python / Django / Flask
-• ☕ Java / Spring Boot
-• ⚛️ React / Vue / Angular
-• 🔥 Node.js / Express
-• 🗄️ SQL / MongoDB
-• 🐘 PHP / Laravel
-
-🎯 **Fonctionnalités avancées :**
-• Code optimisé et commenté
-• Architecture professionnelle
-• Sécurité intégrée
-• Performance maximale
-• Documentation incluse
+⚡ **Configuration optimisée :**
+• Modèle : Llama-8B (le plus rapide)
+• Temps réponse : < 2 secondes
+• Tokens : Limités pour la vitesse
 
 💡 **Utilisation :**
-Tapez simplement : 
-_"Crée un [langage] pour [description]"_
+Envoie ton message et obtiens une réponse ultra-rapide !
 
-**Exemples :**
-• "Crée un site HTML moderne pour un restaurant"
-• "Génère un script Python pour analyser des données"
-• "Code une application React pour gérer des tâches"
+🔄 **Retour au mode normal :** Envoie un message normal
+"""
+    bot.send_message(message.chat.id, quick_info, parse_mode='Markdown')
 
-👑 **Assistant code :** {CREATOR}
-✨ **Prêt à créer de la magie ?**
-    """
-    
-    bot.send_message(message.chat.id, code_menu, parse_mode='Markdown')
-
-@bot.message_handler(commands=['models', 'modeles', 'ia'])
+@bot.message_handler(commands=['models'])
 def models_handler(message):
-    """Display advanced AI models"""
+    """Gestion des modèles IA"""
     bot.send_chat_action(message.chat.id, 'typing')
     
     models_text = """
-🧠 **ARCHITECTURE IA AVANCÉE** 🧠
-
-⚡ **MOTEURS INTELLIGENCE ARTIFICIELLE :**
+🧠 **MODÈLES IA DISPONIBLES**
 
 """
     
     for name, model in MODEL_CONFIG.items():
-        status = "✅ EN LIGNE" if model == current_model else "🟢 DISPONIBLE"
-        models_text += f"• {name} : `{model}` - {status}\n"
+        status = "✅ ACTUEL" if model == current_model else "🟢 DISPONIBLE"
+        speed = "⚡ RAPIDE" if "8b" in model else "🎯 PUISSANT"
+        models_text += f"• {name} - {speed} - {status}\n"
     
     models_text += f"""
-🎯 **MOTEUR ACTUEL :** `{current_model}`
-🚀 **PERFORMANCE :** < 1.2s de réponse
-💾 **MÉMOIRE :** 70B paramètres
-🎪 **PRÉCISION :** 99.7%
+💡 **Recommandation :**
+• Llama-8B : Réponses rapides
+• Llama-70B : Réponses détaillées
 
-🔧 **CHANGEMENT DE MOTEUR :**
-`/model Llama-8B` pour plus de vitesse
-`/model Mixtral` pour plus de créativité
-
-👑 **OPTIMISÉ PAR :** {CREATOR}
-    """
-    
+🔧 **Changer :** `/model Llama-8B`
+"""
     bot.send_message(message.chat.id, models_text, parse_mode='Markdown')
 
 @bot.message_handler(commands=['model'])
 def change_model_handler(message):
-    """Changer le modèle IA"""
+    """Changer de modèle IA"""
     bot.send_chat_action(message.chat.id, 'typing')
     
     try:
         args = message.text.split()
         if len(args) > 1:
-            model_key = ' '.join(args[1:])
-            # Trouver la clé correspondante
+            requested_model = ' '.join(args[1:])
+            
             for name, model in MODEL_CONFIG.items():
-                if model_key.lower() in name.lower():
+                if requested_model.lower() in name.lower():
+                    global current_model
                     current_model = model
                     response = f"""
-🔄 **MOTEUR IA MIS À JOUR** 🔄
+🔄 **MODÈLE MIS À JOUR**
 
-🎯 **NOUVEAU MOTEUR :** {name}
-⚡ **MODÈLE :** `{model}`
-💫 **PERFORMANCE :** Optimisée
-🚀 **VITESSE :** Boostée
+✅ **Nouveau modèle :** {name}
+⚡ **Vitesse :** Optimisée
+🎯 **Performance :** Améliorée
 
-🌟 **Prêt pour l'action !** Votre assistant est maintenant encore plus puissant.
-
-👑 **Configuration par :** {CREATOR}
-                    """
+💡 Prêt à recevoir vos demandes !
+"""
                     break
             else:
                 response = f"""
-❌ **MOTEUR NON RECONNU**
+❌ **MODÈLE NON TROUVÉ**
 
-💡 **Moteurs disponibles :**
+📋 **Modèles disponibles :**
 {', '.join(MODEL_CONFIG.keys())}
 
-🔧 **Usage :** `/model Llama-8B`
-                """
+💡 **Exemple :** `/model Llama-8B`
+"""
         else:
             response = """
-🎯 **CHANGEMENT DE MOTEUR IA**
+🎯 **CHANGER DE MODÈLE**
 
-💡 **Usage :** `/model [nom_du_moteur]`
+💡 **Usage :** `/model [nom]`
 
 **Exemples :**
-• `/model Llama-8B` - Vitesse extrême
-• `/model Mixtral` - Créativité max
-• `/model Gemma2` - Équilibre parfait
-            """
+• `/model Llama-8B` - Pour la vitesse
+• `/model Llama-70B` - Pour la précision
+"""
     except Exception as e:
         response = f"""
-❌ **ERREUR DE CONFIGURATION**
+❌ **ERREUR**
 
 Détails : {str(e)}
 
 👑 **Support :** {CREATOR}
-        """
+"""
     
     bot.send_message(message.chat.id, response, parse_mode='Markdown')
 
-@bot.message_handler(commands=['status', 'info', 'diagnostic'])
-def status_handler(message):
-    """Diagnostic système avancé"""
+@bot.message_handler(commands=['code'])
+def code_handler(message):
+    """Génération de code"""
     bot.send_chat_action(message.chat.id, 'typing')
     
-    status_report = f"""
-📊 **DIAGNOSTIC SYSTÈME AVANCÉ** 📊
+    code_guide = """
+💻 **GÉNÉRATEUR DE CODE**
 
-🤖 **IDENTITÉ :** {BOT_NAME}
-👑 **CRÉATEUR :** {CREATOR}
-💫 **VERSION :** {VERSION}
+🚀 **Langages supportés :**
+• Python, JavaScript, HTML/CSS
+• Java, PHP, SQL
+• Et bien d'autres...
 
-⚡ **PERFORMANCE SYSTÈME :**
-• Modèle IA : `{current_model}`
-• Temps réponse : < 1.2 secondes
-• Disponibilité : 100%
-• Charge serveur : Optimal
+💡 **Comment utiliser :**
+"Crée un [langage] pour [description]"
 
-🎯 **STATISTIQUES :**
-• Images galerie : {len(IMAGE_GALLERY)}
-• Modèles disponibles : {len(MODEL_CONFIG)}
-• Commandes actives : 15+
-• Uptime : Continu
+**Exemples :**
+• "Crée un script Python pour analyser un fichier CSV"
+• "Génère une page HTML moderne pour un portfolio"
+• "Code une fonction JavaScript pour valider un formulaire"
 
-🔧 **SERVICES :**
-• API Groq : ✅ Opérationnel
-• Génération code : ✅ Actif
-• Interface : ✅ Premium
-• Support : ✅ 24/7
+🎯 **Fonctionnalités :**
+• Code bien formaté et commenté
+• Facile à copier
+• Optimisé pour la performance
 
-🌟 **SYSTÈME :** **OPÉRATIONNEL ULTRA**
-🎪 **STATUT :** **EXCELLENT**
+👑 **Expert en code :** {CREATOR}
+"""
+    bot.send_message(message.chat.id, code_guide, parse_mode='Markdown')
 
-👑 **MAINTENU PAR :** {CREATOR}
-    """
-    
-    bot.send_message(message.chat.id, status_report, parse_mode='Markdown')
-
-@bot.message_handler(commands=['help', 'aide', 'support'])
-def help_handler(message):
-    """Guide d'utilisation ultime"""
-    bot.send_chat_action(message.chat.id, 'typing')
-    
-    help_guide = f"""
-🆘 **GUIDE ULTIME {BOT_NAME}** 🆘
-
-🎯 **COMMANDES PRINCIPALES :**
-
-🚀 **Accueil & Interface**
-• /start - Menu prestige
-• /menu - Interface complète  
-• /gallery - Galerie exclusive
-
-💻 **Génération & Code**
-• /code - Mode programmation
-• /models - Technologies IA
-• /model - Changer moteur
-
-📊 **Système & Info**
-• /status - Diagnostic avancé
-• /help - Ce guide
-
-💡 **UTILISATION AVANCÉE :**
-
-**Pour du code :**
-_"Crée un [langage] pour [projet]"_
-
-**Exemples concrets :**
-• "Crée un site HTML/CSS moderne pour portfolio"
-• "Génère un script Python pour analyse données"
-• "Code une app React avec hooks modernes"
-
-**Pour des réponses :**
-Posez simplement vos questions !
-
-🎨 **FONCTIONNALITÉS EXCLUSIVES :**
-• Codes copiables en 1 clic
-• Interface design premium
-• Réponses ultra-rapides
-• Support multilingue
-
-👑 **ASSISTANCE :** {CREATOR}
-🌟 **VERSION :** {VERSION}
-
-💫 **Prêt à créer de la magie numérique ?**
-    """
-    
-    bot.send_message(message.chat.id, help_guide, parse_mode='Markdown')
-
-# ==================== MOTEUR IA PRINCIPAL ====================
+# ==================== MOTEUR IA OPTIMISÉ ====================
 @bot.message_handler(func=lambda message: True)
-def elite_ai_processor(message):
-    """Moteur IA ultra-performant avec génération de code"""
+def message_handler(message):
+    """Gestionnaire principal optimisé"""
+    # Test de connexion avant de traiter
+    if not test_groq_connection():
+        bot.send_message(message.chat.id, 
+            "🔌 **PROBLÈME DE CONNEXION**\n\n"
+            "L'API Groq est temporairement indisponible.\n\n"
+            "💡 **Solutions :**\n"
+            "• Vérifie ta connexion Internet\n"
+            "• Réessaie dans 1 minute\n"
+            "• Utilise un modèle différent avec /models\n\n"
+            "👑 **Support :** {CREATOR}",
+            parse_mode='Markdown'
+        )
+        return
+
+    bot.send_chat_action(message.chat.id, 'typing')
+    
     try:
-        bot.send_chat_action(message.chat.id, 'typing')
-        
         headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {GROQ_API_KEY}"
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
         }
 
-        # Prompt système élite
-        system_prompt = f"""Tu es {BOT_NAME}, l'assistant IA le plus avancé, créé par {CREATOR}.
+        # Prompt optimisé pour la vitesse
+        system_prompt = f"""Tu es {BOT_NAME}, assistant IA personnel de {CREATOR}.
 
-TON IDENTITÉ :
-- Assistant IA élite et premium
-- Expert en génération de code parfait
-- Interface design et professionnelle
-- Réponses ultra-rapides et précises
+Tu es rapide, précis et utile. Réponds de manière concise et efficace.
 
-SPÉCIALITÉS CODE :
-- Génère du code optimisé et commenté
-- Supporte HTML, CSS, JavaScript, Python, Java, etc.
-- Fournis des solutions complètes et professionnelles
-- Ajoute des commentaires et documentation
+Si on te demande de générer du code, formate-le proprement avec des commentaires.
 
-DIRECTIVES :
-- Sois extrêmement précis et technique
-- Formatte les codes avec soin pour la copie
-- Utilise un ton premium et professionnel
-- Réponds en français sauf demande contraire
-
-TA MISSION :
-Offrir l'expérience IA la plus premium qui existe."""
+Réponds en français sauf demande contraire."""
 
         payload = {
             "messages": [
-                {
-                    "role": "system", 
-                    "content": system_prompt
-                },
-                {
-                    "role": "user", 
-                    "content": message.text
-                }
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": message.text}
             ],
             "model": current_model,
+            "max_tokens": 1024,
             "temperature": 0.7,
-            "max_tokens": 2048,
             "top_p": 0.9
         }
 
-        response = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=20)
+        # Timeout réduit pour éviter les longs délais
+        response = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=15)
         
         if response.status_code == 200:
             data = response.json()
-            ai_response = data["choices"][0]["message"]["content"]
+            answer = data["choices"][0]["message"]["content"]
             
-            # Détection et formatage des blocs de code
-            code_blocks = re.findall(r'```(?:[\w]*)\n?(.*?)```', ai_response, re.DOTALL)
+            # Détection de code
+            code_blocks = re.findall(r'```(?:[\w]*)\n?(.*?)```', answer, re.DOTALL)
             
             if code_blocks:
-                # Mode génération de code avec formatage spécial
-                formatted_response = create_code_response(ai_response, code_blocks)
+                formatted_response = "💻 **CODE GÉNÉRÉ** 💻\n\n"
+                for i, code in enumerate(code_blocks, 1):
+                    lang = "python"  # Détection automatique basique
+                    if "html" in message.text.lower():
+                        lang = "html"
+                    elif "css" in message.text.lower():
+                        lang = "css"
+                    elif "javascript" in message.text.lower() or "js" in message.text.lower():
+                        lang = "javascript"
+                    
+                    formatted_response += f"📦 **Bloc {i}**\n```{lang}\n{code.strip()}\n```\n\n"
+                
+                formatted_response += "📋 **Copie facile** - Sélectionne et copie\n👑 **Expert :** {CREATOR}"
                 bot.reply_to(message, formatted_response, parse_mode='Markdown')
             else:
-                # Réponse normale avec style premium
-                premium_response = f"""
-✨ **RÉPONSE PRESTIGE** ✨
-
-{ai_response}
-
----
-🎯 **Assistant :** {BOT_NAME}
-👑 **Expertise :** {CREATOR}
-💫 **Précision :** Maximum
-                """
-                bot.reply_to(message, premium_response, parse_mode='Markdown')
+                # Réponse normale
+                final_response = f"✨ **RÉPONSE** ✨\n\n{answer}\n\n---\n🤖 {BOT_NAME} par {CREATOR}"
+                bot.reply_to(message, final_response, parse_mode='Markdown')
                 
         else:
             error_msg = f"""
-❌ **DÉLAI D'ATTENTE**
+❌ **ERREUR API**
 
-L'API met plus de temps que prévu à répondre.
+Détails : Code {response.status_code}
 
-💡 **Solutions :**
-• Réessayez dans quelques instants
-• Utilisez un modèle plus rapide avec /models
-• Vérifiez votre connexion
+💡 **Solutions rapides :**
+• Réessaye maintenant
+• Utilise `/model Llama-8B` pour plus de vitesse
+• Vérifie ta connexion
 
-👑 **Support technique :** {CREATOR}
-            """
+👑 **Technical Support :** {CREATOR}
+"""
             bot.reply_to(message, error_msg, parse_mode='Markdown')
-
+            
     except requests.exceptions.Timeout:
-        timeout_msg = f"""
-⏰ **TEMPS D'ATTENTE DÉPASSÉ**
-
-Notre système met plus de temps que prévu.
-
-🚀 **Actions recommandées :**
-• Réduction de la complexité de la requête
-• Utilisation de /models pour un moteur plus rapide
-• Nouvelle tentative
-
-👑 **Optimisé par :** {CREATOR}
-        """
-        bot.reply_to(message, timeout_msg, parse_mode='Markdown')
-
+        bot.reply_to(message,
+            "⏰ **DÉLAI DÉPASSÉ**\n\n"
+            "La requête prend trop de temps.\n\n"
+            "🚀 **Actions rapides :**\n"
+            "• Utilise `/quick` pour le mode rapide\n"
+            "• Change de modèle avec `/models`\n"
+            "• Réduis la complexité de ta question\n\n"
+            "👑 **Optimisé par :** {CREATOR}",
+            parse_mode='Markdown'
+        )
+        
     except Exception as e:
-        elite_error = f"""
-🔴 **INCIDENT SYSTÈME**
+        bot.reply_to(message,
+            "🔴 **ERREUR INATTENDUE**\n\n"
+            f"Détails : {str(e)}\n\n"
+            "👑 **Support immédiat :** {CREATOR}",
+            parse_mode='Markdown'
+        )
 
-Une erreur inattendue s'est produite.
-
-🔧 **Détails techniques :**
-{str(e)}
-
-👑 **Support immédiat :** {CREATOR}
-💡 **Diagnostic :** /status
-        """
-        bot.reply_to(message, elite_error, parse_mode='Markdown')
-
-# ==================== LANCEMENT ULTRA ====================
+# ==================== DÉMARRAGE ====================
 if __name__ == "__main__":
     print(f"""
-╔══════════════════════════════════════╗
-║           {BOT_NAME}           ║  
-║           {VERSION}           ║
-╠══════════════════════════════════════╣
-║ 🚀  Initialisation du système...    ║
-║ 💫  Chargement des modules IA...    ║
-║ 🎯  Optimisation des performances...║
-║ ✨  Interface prestige activée...   ║
-╠══════════════════════════════════════╣
-║ 👑  Créateur : {CREATOR}       ║
-║ 🤖  Modèle : {current_model} ║
-║ 🖼️  Galerie : {len(IMAGE_GALLERY)} artworks     ║
-║ ⚡  Statut : OPÉRATIONNEL ULTRA     ║
-╚══════════════════════════════════════╝
+🎯 {BOT_NAME} - {VERSION}
+👑 Créateur : {CREATOR}
+⚡ Modèle : {current_model}
+📸 Photos : {len(IMAGE_GALLERY)}
+🚀 Statut : Opérationnel
+
+💡 Pour configurer tes photos :
+Remplace les URLs dans IMAGE_GALLERY par tes propres images
     """)
     
     try:
         bot.infinity_polling()
     except Exception as e:
-        print(f"🔴 ARRÊT CRITIQUE : {e}")
-        print(f"👑 CONTACT : {CREATOR}")
+        print(f"❌ Erreur : {e}")
+        print(f"👑 Contact : {CREATOR}")
