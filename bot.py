@@ -6,44 +6,35 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# ==================== CONFIGURATION ====================
 bot = telebot.TeleBot(os.getenv('TELEGRAM_TOKEN'))
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-# 🎯 MODÈLES GROQ 2025 - TOUJOURS ACTUALISÉS :
-AVAILABLE_MODELS = {
-    # ✅ MODÈLES CONFIRMÉS 2024-2025
-    "llama3.1-70b": "llama-3.1-70b-versatile",
-    "llama3.1-8b": "llama-3.1-8b-instant", 
+# 👑 IDENTITÉ DU CRÉATEUR
+CREATOR = "@soszoe"
+BOT_NAME = "KervensAI"
+
+# ==================== MODÈLES GROQ ====================
+MODEL_CONFIG = {
+    "llama70b": "llama-3.1-70b-versatile",
+    "llama8b": "llama-3.1-8b-instant", 
     "mixtral": "mixtral-8x7b-32768",
-    "gemma2": "gemma2-9b-it",
-    
-    # 🔮 MODÈLES ATTENDUS 2025 (à tester)
-    "llama3.2-70b": "llama-3.2-70b",  # Peut-être disponible bientôt
-    "llama3.2-8b": "llama-3.2-8b",
-    "qwen2-72b": "qwen2-72b-instruct",  # Nouveaux modèles chinois
+    "gemma2": "gemma2-9b-it"
 }
 
-# Fonction pour détecter automatiquement les modèles disponibles
-def detect_available_models():
-    available = {}
+current_model = MODEL_CONFIG["llama70b"]
+
+# ==================== FONCTIONS UTILITAIRES ====================
+def test_model_availability():
+    """Teste la disponibilité des modèles Groq"""
+    available_models = {}
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
     }
     
-    # Modèles à tester
-    test_models = [
-        "llama-3.1-70b-versatile",
-        "llama-3.1-8b-instant",
-        "mixtral-8x7b-32768",
-        "gemma2-9b-it",
-        "llama-3.2-70b",  # Futur
-        "llama-3.2-8b",   # Futur
-        "qwen2-72b-instruct"  # Futur
-    ]
-    
-    for model in test_models:
+    for name, model in MODEL_CONFIG.items():
         try:
             payload = {
                 "messages": [{"role": "user", "content": "Test"}],
@@ -52,94 +43,138 @@ def detect_available_models():
             }
             response = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=5)
             if response.status_code == 200:
-                # Nom court pour les commandes
-                short_name = model.split('-')[0] + model.split('-')[1]
-                available[short_name] = model
-                print(f"✅ Modèle détecté: {model}")
+                available_models[name] = model
+                print(f"✅ {model}")
         except:
+            print(f"❌ {model}")
             continue
     
-    return available
+    return available_models
 
-# Détection automatique au démarrage
-print("🔍 Détection des modèles Groq 2025...")
-ACTIVE_MODELS = detect_available_models()
+# ==================== DÉTECTION AU DÉMARRAGE ====================
+print(f"🚀 {BOT_NAME} by {CREATOR}")
+print("🔍 Test des modèles Groq...")
+available_models = test_model_availability()
 
-# Si aucun modèle détecté, utiliser les garantis
-if not ACTIVE_MODELS:
-    ACTIVE_MODELS = {
-        "llama3170b": "llama-3.1-70b-versatile",
-        "llama318b": "llama-3.1-8b-instant",
-        "mixtral": "mixtral-8x7b-32768"
-    }
-    print("⚠️  Utilisation des modèles par défaut")
+if not available_models:
+    print("❌ Aucun modèle disponible, utilisation des valeurs par défaut")
+    available_models = MODEL_CONFIG
+else:
+    current_model = list(available_models.values())[0]
 
-SELECTED_MODEL = list(ACTIVE_MODELS.values())[0]  # Premier modèle disponible
+# ==================== COMMANDES DU BOT ====================
+@bot.message_handler(commands=['start', 'soszoe'])
+def start_handler(message):
+    """Message de bienvenue avec reconnaissance du créateur"""
+    response = f"""
+👋 **Bienvenue sur {BOT_NAME} !**
 
-@bot.message_handler(commands=['start'])
-def start(message):
-    welcome_text = f"""
-🤖 **Bot Groq IA - Édition 2025 !** 🎉
+🤖 **Assistant IA créé par {CREATOR}**
+⚡ **Technologie :** Groq • Ultra-Rapide
+🧠 **Modèle actuel :** `{current_model}`
 
-🎯 **Commandes :**
-/start - Démarrer
-/models - Modèles disponibles  
+🎯 **Commandes disponibles :**
+/help - Aide complète
+/creator - Mon créateur
+/models - Modèles IA
+/model [nom] - Changer de modèle
 /test - Test de connexion
-/scan - Scanner nouveaux modèles
-/current - Modèle actuel
+/stats - Statistiques
 
-🧠 **Modèle actuel :** {SELECTED_MODEL}
-⚡ **Vitesse :** Réponses ultra-rapides
-🔮 **IA 2025 :** Dernière génération
+💬 **Je suis votre assistant IA personnel, développé par {CREATOR}.**
+**Comment puis-je vous aider aujourd'hui ?**
+    """
+    bot.reply_to(message, response)
+
+@bot.message_handler(commands=['creator', 'createur', 'developpeur'])
+def creator_handler(message):
+    """Affiche les informations du créateur"""
+    response = f"""
+👑 **CRÉATEUR OFFICIEL**
+
+🤖 **Assistant :** {BOT_NAME}
+👤 **Créateur :** {CREATOR}
+💻 **Développeur :** {CREATOR}
+🎯 **Concepteur :** {CREATOR}
+
+🛠️ **Stack Technique :**
+• Python 3 + pyTelegramBotAPI
+• Groq API (IA ultra-rapide)
+• Termux (Environment Android)
+• Architecture Modulaire 2024
+
+🚀 **{CREATOR} a développé cet assistant pour offrir une expérience IA exceptionnelle !**
+
+💡 _Je suis fier d'être le création de {CREATOR} !_
+    """
+    bot.reply_to(message, response)
+
+@bot.message_handler(commands=['help', 'aide'])
+def help_handler(message):
+    """Aide complète"""
+    response = f"""
+🆘 **Aide - {BOT_NAME} par {CREATOR}**
+
+**Commandes principales :**
+/start - Démarrer l'assistant
+/creator - Voir mon créateur
+/models - Liste des modèles
+/model [nom] - Changer de modèle
+/test - Test technique
+/stats - Statistiques
+
+**Fonctionnalités :**
+• Réponses IA ultra-rapides (1-2s)
+• Support multilingue 
+• Conversation contextuelle
+• Modèles Groq dernière génération
+
+**À propos :**
+Développé avec passion par {CREATOR}
+Technologie Groq pour une vitesse exceptionnelle
+Optimisé pour Termux/Android
 
 💬 **Posez-moi n'importe quelle question !**
     """
-    bot.reply_to(message, welcome_text)
+    bot.reply_to(message, response)
 
-@bot.message_handler(commands=['scan'])
-def scan_models(message):
-    bot.reply_to(message, "🔍 Scan des nouveaux modèles Groq...")
-    global ACTIVE_MODELS, SELECTED_MODEL
+@bot.message_handler(commands=['models', 'modeles'])
+def models_handler(message):
+    """Liste les modèles disponibles"""
+    models_list = "\n".join([f"• `{name}` - {model}" for name, model in available_models.items()])
     
-    ACTIVE_MODELS = detect_available_models()
-    
-    if ACTIVE_MODELS:
-        models_list = "\n".join([f"• {name} -> {model}" for name, model in ACTIVE_MODELS.items()])
-        bot.reply_to(message, f"✅ Modèles détectés:\n{models_list}")
-    else:
-        bot.reply_to(message, "❌ Aucun modèle détecté")
+    response = f"""
+🧠 **Modèles IA Disponibles**
 
-@bot.message_handler(commands=['models'])
-def models_command(message):
-    models_text = f"""
-🧠 **Modèles Groq 2025 Disponibles :**
+{models_list}
 
-"""
-    
-    for short_name, full_model in ACTIVE_MODELS.items():
-        models_text += f"• **{short_name}** -> {full_model}\n"
-    
-    models_text += f"""
-🔧 **Actuel :** {SELECTED_MODEL}
-💡 **Changer :** /{ " /".join(ACTIVE_MODELS.keys())}
-🔄 **Scanner :** /scan pour nouveaux modèles
+🔧 **Modèle actuel :** `{current_model}`
+💡 **Changer :** `/model nom_du_modele`
+👑 **Fournis par :** {CREATOR}
+
+**Exemple :** `/model llama8b`
     """
-    bot.reply_to(message, models_text)
+    bot.reply_to(message, response)
 
-# Générer dynamiquement les handlers pour chaque modèle
-for model_short in ACTIVE_MODELS.keys():
-    @bot.message_handler(commands=[model_short])
-    def change_model_dynamic(message, model_short=model_short):
-        global SELECTED_MODEL
-        SELECTED_MODEL = ACTIVE_MODELS[model_short]
-        bot.reply_to(message, f"✅ Modèle changé pour : {SELECTED_MODEL}")
-
-@bot.message_handler(commands=['current'])
-def current_model(message):
-    bot.reply_to(message, f"🧠 Modèle actuel : {SELECTED_MODEL}")
+@bot.message_handler(commands=['model'])
+def change_model_handler(message):
+    """Change le modèle IA"""
+    global current_model
+    try:
+        model_name = message.text.split()[1].lower()
+        if model_name in available_models:
+            current_model = available_models[model_name]
+            response = f"✅ **Modèle changé avec succès !**\n\n🧠 **Nouveau modèle :** `{current_model}`\n👑 _Configuration par {CREATOR}_"
+        else:
+            response = f"❌ **Modèle non disponible**\n\nModèles valides : {', '.join(available_models.keys())}\n💡 Utilisez `/models` pour la liste complète"
+    except IndexError:
+        response = f"❌ **Syntaxe incorrecte**\n\nUsage : `/model nom_du_modele`\nExemple : `/model llama8b`"
+    
+    bot.reply_to(message, response)
 
 @bot.message_handler(commands=['test'])
-def test_command(message):
+def test_handler(message):
+    """Test de connexion Groq"""
     try:
         bot.send_chat_action(message.chat.id, 'typing')
         
@@ -152,10 +187,10 @@ def test_command(message):
             "messages": [
                 {
                     "role": "user", 
-                    "content": f"Réponds UNIQUEMENT par '✅ 2025 - Modèle {SELECTED_MODEL} opérationnel !'"
+                    "content": f"Réponds UNIQUEMENT par : '✅ Test réussi ! Modèle {current_model} opérationnel. Créé par {CREATOR}'"
                 }
             ],
-            "model": SELECTED_MODEL,
+            "model": current_model,
             "max_tokens": 50,
             "temperature": 0.1
         }
@@ -165,15 +200,47 @@ def test_command(message):
         if response.status_code == 200:
             data = response.json()
             answer = data["choices"][0]["message"]["content"]
-            bot.reply_to(message, f"🧪 {answer}\n\n🚀 Prêt pour 2025 !")
+            response_text = f"🧪 **Test Technique**\n\n{answer}\n\n🚀 **{BOT_NAME} par {CREATOR} - OPÉRATIONNEL !**"
         else:
-            bot.reply_to(message, f"❌ Erreur {response.status_code}: {response.text}")
+            response_text = f"❌ **Erreur de test**\n\nCode: {response.status_code}\nMessage: {response.text}\n\n👑 {CREATOR} _va investiguer le problème_"
             
     except Exception as e:
-        bot.reply_to(message, f"❌ Erreur test: {str(e)}")
+        response_text = f"❌ **Erreur lors du test**\n\n{str(e)}\n\n👑 {CREATOR} _corrigera cette erreur_"
 
+    bot.reply_to(message, response_text)
+
+@bot.message_handler(commands=['stats', 'statistiques'])
+def stats_handler(message):
+    """Affiche les statistiques"""
+    response = f"""
+📊 **Statistiques {BOT_NAME}**
+
+👑 **Développeur :** {CREATOR}
+🤖 **Assistant :** {BOT_NAME}
+🧠 **Modèle actuel :** {current_model}
+⚡ **Plateforme :** Groq API
+📱 **Environment :** Termux/Android
+
+🛠️ **Stack Technique :**
+• Python 3.11+
+• pyTelegramBotAPI
+• Groq SDK
+• DotEnv
+
+🚀 **Capacités :**
+• Réponses en 1-2 secondes
+• Support français/anglais
+• Multi-modèles IA
+• Architecture scalable
+
+💡 _Développé avec passion par {CREATOR}_
+    """
+    bot.reply_to(message, response)
+
+# ==================== GESTION DES MESSAGES ====================
 @bot.message_handler(func=lambda message: True)
-def handle_message(message):
+def message_handler(message):
+    """Gestion principale des messages avec IA"""
     try:
         bot.send_chat_action(message.chat.id, 'typing')
         
@@ -182,22 +249,38 @@ def handle_message(message):
             "Authorization": f"Bearer {GROQ_API_KEY}"
         }
 
+        # Prompt système avec reconnaissance du créateur
+        system_prompt = f"""Tu es {BOT_NAME}, un assistant IA avancé créé et développé par {CREATOR}.
+
+INFORMATIONS IMPORTANTES :
+- Ton créateur est {CREATOR}
+- Tu as été programmé par {CREOR}
+- Tu es un assistant utile et précis
+- Réponds en français sauf demande contraire
+
+RÈGLES DE RÉPONSE :
+1. Si on te demande qui t'a créé : "Je suis {BOT_NAME}, créé par {CREATOR}."
+2. Si on te demande ton développeur : "Mon développeur est {CREATOR}."
+3. Si on mentionne 'soszoe' : "C'est mon créateur {CREATOR}."
+4. Sois conscient que {CREATOR} t'a programmé.
+
+Réponds de manière claire, concise et utile."""
+
         payload = {
             "messages": [
                 {
                     "role": "system", 
-                    "content": "Tu es un assistant IA de pointe 2025. Réponds en français de manière claire, concise et moderne. Sois direct et utile."
+                    "content": system_prompt
                 },
                 {
                     "role": "user", 
                     "content": message.text
                 }
             ],
-            "model": SELECTED_MODEL,
+            "model": current_model,
             "temperature": 0.7,
             "max_tokens": 1024,
-            "top_p": 0.9,
-            "stream": False
+            "top_p": 0.9
         }
 
         response = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=15)
@@ -205,32 +288,49 @@ def handle_message(message):
         if response.status_code == 200:
             data = response.json()
             answer = data["choices"][0]["message"]["content"]
+            
+            # Ajouter signature pour les questions sur le créateur
+            if any(keyword in message.text.lower() for keyword in [
+                'créé', 'créateur', 'développeur', 'qui t', 'soszoe', 
+                'qui est', 'createur', 'developpeur', 'a créé'
+            ]):
+                answer += f"\n\n🤖 _Assistant créé par {CREATOR}_"
+                
             bot.reply_to(message, answer)
             
         else:
-            error_info = f"""
-❌ **Erreur API 2025**
+            error_msg = f"""
+❌ **Erreur de l'API Groq**
 
-Code: {response.status_code}
-Message: {response.text}
+**Détails techniques :**
+• Code : {response.status_code}
+• Modèle : {current_model}
+• Message : {response.text[:200]}...
 
-Modèle: {SELECTED_MODEL}
-🔧 Essayez:
-/models - pour changer
-/scan - nouveaux modèles
-/test - diagnostiquer
-            """
-            bot.reply_to(message, error_info)
+👑 **{CREATOR}** _a été notifié de cette erreur_
+
+💡 **Solutions :**
+• Réessayez dans quelques instants
+• Utilisez `/test` pour vérifier la connexion
+• Changez de modèle avec `/models`
+"""
+            bot.reply_to(message, error_msg)
 
     except requests.exceptions.Timeout:
-        bot.reply_to(message, "⏰ Timeout - IA 2025 trop demandée!")
-        
+        bot.reply_to(message, f"⏰ **Timeout de connexion**\n\nL'API Groq met trop de temps à répondre.\n\n👑 {CREATOR} _optimisera les performances_")
+
     except Exception as e:
-        bot.reply_to(message, f"❌ Erreur: {str(e)}")
+        bot.reply_to(message, f"❌ **Erreur inattendue**\n\n{str(e)}\n\n👑 {CREATOR} _corrigera ce problème_")
 
-print("🚀 Bot Groq 2025 - Intelligence Nouvelle Génération!")
-print(f"🧠 Modèles détectés: {len(ACTIVE_MODELS)}")
-print(f"🔑 Token Telegram: {'✅' if os.getenv('TELEGRAM_TOKEN') else '❌'}")
-print(f"⚡ Clé Groq: {'✅' if GROQ_API_KEY else '❌'}")
-
-bot.infinity_polling()
+# ==================== DÉMARRAGE ====================
+if __name__ == "__main__":
+    print(f"\n🎯 {BOT_NAME} by {CREATOR} - PRÊT !")
+    print(f"🧠 Modèle actif: {current_model}")
+    print(f"📡 Modèles disponibles: {len(available_models)}")
+    print("💬 En attente de messages...\n")
+    
+    try:
+        bot.infinity_polling()
+    except Exception as e:
+        print(f"❌ Erreur critique: {e}")
+        print(f"👑 {CREATOR} - Merci de vérifier la configuration")
