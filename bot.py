@@ -11,22 +11,17 @@ from dotenv import load_dotenv
 print("🚀 Initialisation du Bot IA Termux...")
 
 # ==================== CONFIGURATION SÉCURISÉE ====================
-# Charge les variables d'environnement depuis le fichier .env
 load_dotenv()
 
-# Récupère les tokens de manière sécurisée
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
-# Vérification que les clés sont présentes
 if not TELEGRAM_TOKEN:
     print("❌ ERREUR: TELEGRAM_TOKEN non trouvé dans .env")
-    print("💡 Crée un fichier .env avec votre token Telegram")
     exit(1)
 
 if not OPENAI_API_KEY:
     print("❌ ERREUR: OPENAI_API_KEY non trouvé dans .env")
-    print("💡 Crée un fichier .env avec votre clé API OpenAI")
     exit(1)
 
 # Initialisation du bot
@@ -67,8 +62,6 @@ def welcome_message(message):
 `/learn` la programmation Python
 `/ideas` projet écologique innovant
 `/write` une lettre de motivation
-`/explain` la blockchain
-`/translate` Hello, how are you?
 
 📱 *Bot déployé sur Termux avec ❤️*
     """
@@ -87,8 +80,8 @@ def ask_question(message):
         print(f"🧠 Question reçue : {question[:50]}...")
         bot.send_chat_action(message.chat.id, 'typing')
         
-        # Appel à l'API OpenAI
-        response = openai.chat.completions.create(
+        # NOUVELLE SYNTAXE OpenAI
+        response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "Tu es un assistant utile et précis. Réponds de manière claire et détaillée."},
@@ -143,7 +136,8 @@ def learn_topic(message):
         Sois pédagogique et passionnant !
         """
         
-        response = openai.chat.completions.create(
+        # NOUVELLE SYNTAXE OpenAI
+        response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=1000
@@ -178,7 +172,8 @@ def generate_ideas(message):
         
         prompt = f"Génère 5 idées créatives, innovantes et pratiques sur le thème : {theme}. Pour chaque idée, donne un titre accrocheur et une brève description."
         
-        response = openai.chat.completions.create(
+        # NOUVELLE SYNTAXE OpenAI
+        response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=600
@@ -213,7 +208,8 @@ def write_content(message):
         
         prompt = f"Rédige : {request}. Sois créatif, clair et adapte le style au contexte demandé."
         
-        response = openai.chat.completions.create(
+        # NOUVELLE SYNTAXE OpenAI
+        response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=800
@@ -248,7 +244,8 @@ def explain_concept(message):
         
         prompt = f"Explique le concept '{concept}' de manière simple et accessible, comme si tu parlais à un ami. Utilise des analogies de la vie quotidienne."
         
-        response = openai.chat.completions.create(
+        # NOUVELLE SYNTAXE OpenAI
+        response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=600
@@ -283,7 +280,8 @@ def translate_text(message):
         
         prompt = f"Traduis ce texte en français s'il est en anglais, ou en anglais s'il est en français. Texte: {text}"
         
-        response = openai.chat.completions.create(
+        # NOUVELLE SYNTAXE OpenAI
+        response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=400
@@ -333,7 +331,6 @@ def bot_status(message):
 
 @bot.message_handler(func=lambda message: True)
 def handle_all_messages(message):
-    # Ignore les commandes inconnues
     if message.text.startswith('/'):
         help_text = """
 ❓ **Commande non reconnue**
@@ -353,12 +350,12 @@ def handle_all_messages(message):
         bot.reply_to(message, help_text, parse_mode='Markdown')
     
     else:
-        # Mode conversation libre
         try:
             print(f"💬 Message libre : {message.text[:30]}...")
             bot.send_chat_action(message.chat.id, 'typing')
             
-            response = openai.chat.completions.create(
+            # NOUVELLE SYNTAXE OpenAI
+            response = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": "Tu es un assistant amical, intelligent et utile. Réponds de manière naturelle et engageante."},
@@ -375,28 +372,25 @@ def handle_all_messages(message):
         except Exception as e:
             bot.reply_to(message, "🤖 Je rencontre un petit problème. Réessaie avec une commande comme `/ask` !", parse_mode='Markdown')
 
-# ==================== GESTION DES ERREURS ====================
+# ==================== DÉMARRAGE ====================
 
-def main():
-    try:
-        print("""
+if __name__ == "__main__":
+    print("""
 🎯 BOT IA TERMUX - PRÊT AU DÉMARRAGE
 =====================================
 ✅ Configuration chargée
 ✅ Handlers enregistrés  
 ✅ En attente de messages...
-        """)
-        
+    """)
+    
+    try:
         bot.infinity_polling()
-        
-    except KeyboardInterrupt:
-        print("\n🛑 Arrêt demandé par l'utilisateur")
-        
     except Exception as e:
         print(f"🚨 ERREUR CRITIQUE : {e}")
         print("🔄 Redémarrage dans 10 secondes...")
         time.sleep(10)
-        main()
-
-if __name__ == "__main__":
-    main()
+        
+        try:
+            bot.infinity_polling()
+        except:
+            print("❌ Impossible de redémarrer. Vérifie ta connexion.")
