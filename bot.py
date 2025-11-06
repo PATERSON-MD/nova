@@ -10,74 +10,129 @@ bot = telebot.TeleBot(os.getenv('TELEGRAM_TOKEN'))
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-# 🎯 MODÈLES CORRECTS GROQ :
+# 🎯 MODÈLES GROQ 2025 - TOUJOURS ACTUALISÉS :
 AVAILABLE_MODELS = {
-    "llama3-8b": "llama3-8b-8192",
-    "llama3-70b": "llama3-70b-8192", 
+    # ✅ MODÈLES CONFIRMÉS 2024-2025
+    "llama3.1-70b": "llama-3.1-70b-versatile",
+    "llama3.1-8b": "llama-3.1-8b-instant", 
     "mixtral": "mixtral-8x7b-32768",
-    "gemma": "gemma-7b-it"
+    "gemma2": "gemma2-9b-it",
+    
+    # 🔮 MODÈLES ATTENDUS 2025 (à tester)
+    "llama3.2-70b": "llama-3.2-70b",  # Peut-être disponible bientôt
+    "llama3.2-8b": "llama-3.2-8b",
+    "qwen2-72b": "qwen2-72b-instruct",  # Nouveaux modèles chinois
 }
 
-# Modèle par défaut (choisissez-en un)
-SELECTED_MODEL = AVAILABLE_MODELS["llama3-70b"]
+# Fonction pour détecter automatiquement les modèles disponibles
+def detect_available_models():
+    available = {}
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    # Modèles à tester
+    test_models = [
+        "llama-3.1-70b-versatile",
+        "llama-3.1-8b-instant",
+        "mixtral-8x7b-32768",
+        "gemma2-9b-it",
+        "llama-3.2-70b",  # Futur
+        "llama-3.2-8b",   # Futur
+        "qwen2-72b-instruct"  # Futur
+    ]
+    
+    for model in test_models:
+        try:
+            payload = {
+                "messages": [{"role": "user", "content": "Test"}],
+                "model": model,
+                "max_tokens": 5
+            }
+            response = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=5)
+            if response.status_code == 200:
+                # Nom court pour les commandes
+                short_name = model.split('-')[0] + model.split('-')[1]
+                available[short_name] = model
+                print(f"✅ Modèle détecté: {model}")
+        except:
+            continue
+    
+    return available
+
+# Détection automatique au démarrage
+print("🔍 Détection des modèles Groq 2025...")
+ACTIVE_MODELS = detect_available_models()
+
+# Si aucun modèle détecté, utiliser les garantis
+if not ACTIVE_MODELS:
+    ACTIVE_MODELS = {
+        "llama3170b": "llama-3.1-70b-versatile",
+        "llama318b": "llama-3.1-8b-instant",
+        "mixtral": "mixtral-8x7b-32768"
+    }
+    print("⚠️  Utilisation des modèles par défaut")
+
+SELECTED_MODEL = list(ACTIVE_MODELS.values())[0]  # Premier modèle disponible
 
 @bot.message_handler(commands=['start'])
 def start(message):
     welcome_text = f"""
-🤖 **Bot Groq IA - Modèles Corrigés !** ⚡
+🤖 **Bot Groq IA - Édition 2025 !** 🎉
 
 🎯 **Commandes :**
 /start - Démarrer
-/models - Changer de modèle
+/models - Modèles disponibles  
 /test - Test de connexion
+/scan - Scanner nouveaux modèles
 /current - Modèle actuel
 
 🧠 **Modèle actuel :** {SELECTED_MODEL}
 ⚡ **Vitesse :** Réponses ultra-rapides
+🔮 **IA 2025 :** Dernière génération
 
 💬 **Posez-moi n'importe quelle question !**
     """
     bot.reply_to(message, welcome_text)
 
+@bot.message_handler(commands=['scan'])
+def scan_models(message):
+    bot.reply_to(message, "🔍 Scan des nouveaux modèles Groq...")
+    global ACTIVE_MODELS, SELECTED_MODEL
+    
+    ACTIVE_MODELS = detect_available_models()
+    
+    if ACTIVE_MODELS:
+        models_list = "\n".join([f"• {name} -> {model}" for name, model in ACTIVE_MODELS.items()])
+        bot.reply_to(message, f"✅ Modèles détectés:\n{models_list}")
+    else:
+        bot.reply_to(message, "❌ Aucun modèle détecté")
+
 @bot.message_handler(commands=['models'])
 def models_command(message):
     models_text = f"""
-🧠 **Modèles Groq Disponibles :**
+🧠 **Modèles Groq 2025 Disponibles :**
 
-1. **llama3-70b-8192** (recommandé)
-   - Llama 3 70B dernier cri
-   - Très intelligent
-   - Bon en tout
-
-2. **llama3-8b-8192**
-   - Llama 3 8B rapide
-   - Léger et efficace
-   - Parfait pour le chat
-
-3. **mixtral-8x7b-32768**
-   - 8 experts Mixtral
-   - Excellente qualité
-   - Contexte long
-
-4. **gemma-7b-it** 
-   - Modèle Google
-   - Léger et rapide
-
+"""
+    
+    for short_name, full_model in ACTIVE_MODELS.items():
+        models_text += f"• **{short_name}** -> {full_model}\n"
+    
+    models_text += f"""
 🔧 **Actuel :** {SELECTED_MODEL}
-💡 **Changer :** /llama3-70b /llama3-8b /mixtral /gemma
+💡 **Changer :** /{ " /".join(ACTIVE_MODELS.keys())}
+🔄 **Scanner :** /scan pour nouveaux modèles
     """
     bot.reply_to(message, models_text)
 
-@bot.message_handler(commands=['llama3-70b', 'llama3-8b', 'mixtral', 'gemma'])
-def change_model(message):
-    global SELECTED_MODEL
-    
-    model_command = message.text[1:]  # Enlever le /
-    if model_command in AVAILABLE_MODELS:
-        SELECTED_MODEL = AVAILABLE_MODELS[model_command]
+# Générer dynamiquement les handlers pour chaque modèle
+for model_short in ACTIVE_MODELS.keys():
+    @bot.message_handler(commands=[model_short])
+    def change_model_dynamic(message, model_short=model_short):
+        global SELECTED_MODEL
+        SELECTED_MODEL = ACTIVE_MODELS[model_short]
         bot.reply_to(message, f"✅ Modèle changé pour : {SELECTED_MODEL}")
-    else:
-        bot.reply_to(message, "❌ Commande de modèle invalide")
 
 @bot.message_handler(commands=['current'])
 def current_model(message):
@@ -97,11 +152,12 @@ def test_command(message):
             "messages": [
                 {
                     "role": "user", 
-                    "content": "Réponds UNIQUEMENT par '✅ Test réussi avec [MODÈLE]' en remplaçant [MODÈLE] par le modèle utilisé."
+                    "content": f"Réponds UNIQUEMENT par '✅ 2025 - Modèle {SELECTED_MODEL} opérationnel !'"
                 }
             ],
             "model": SELECTED_MODEL,
-            "max_tokens": 50
+            "max_tokens": 50,
+            "temperature": 0.1
         }
 
         response = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=10)
@@ -109,7 +165,7 @@ def test_command(message):
         if response.status_code == 200:
             data = response.json()
             answer = data["choices"][0]["message"]["content"]
-            bot.reply_to(message, f"🧪 {answer}\n\n🚀 API Groq fonctionne !")
+            bot.reply_to(message, f"🧪 {answer}\n\n🚀 Prêt pour 2025 !")
         else:
             bot.reply_to(message, f"❌ Erreur {response.status_code}: {response.text}")
             
@@ -130,7 +186,7 @@ def handle_message(message):
             "messages": [
                 {
                     "role": "system", 
-                    "content": "Tu es un assistant IA utile. Réponds en français de manière claire et concise. Sois direct dans tes réponses."
+                    "content": "Tu es un assistant IA de pointe 2025. Réponds en français de manière claire, concise et moderne. Sois direct et utile."
                 },
                 {
                     "role": "user", 
@@ -140,7 +196,7 @@ def handle_message(message):
             "model": SELECTED_MODEL,
             "temperature": 0.7,
             "max_tokens": 1024,
-            "top_p": 1,
+            "top_p": 0.9,
             "stream": False
         }
 
@@ -153,24 +209,27 @@ def handle_message(message):
             
         else:
             error_info = f"""
-❌ **Erreur Groq API**
+❌ **Erreur API 2025**
 
 Code: {response.status_code}
 Message: {response.text}
 
-Modèle utilisé: {SELECTED_MODEL}
-🔧 Essayez /models pour changer de modèle
+Modèle: {SELECTED_MODEL}
+🔧 Essayez:
+/models - pour changer
+/scan - nouveaux modèles
+/test - diagnostiquer
             """
             bot.reply_to(message, error_info)
 
     except requests.exceptions.Timeout:
-        bot.reply_to(message, "⏰ Timeout - Réessayez!")
+        bot.reply_to(message, "⏰ Timeout - IA 2025 trop demandée!")
         
     except Exception as e:
         bot.reply_to(message, f"❌ Erreur: {str(e)}")
 
-print("🚀 Bot Groq démarré avec modèles corrigés!")
-print(f"🧠 Modèle par défaut: {SELECTED_MODEL}")
+print("🚀 Bot Groq 2025 - Intelligence Nouvelle Génération!")
+print(f"🧠 Modèles détectés: {len(ACTIVE_MODELS)}")
 print(f"🔑 Token Telegram: {'✅' if os.getenv('TELEGRAM_TOKEN') else '❌'}")
 print(f"⚡ Clé Groq: {'✅' if GROQ_API_KEY else '❌'}")
 
