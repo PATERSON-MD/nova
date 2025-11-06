@@ -6,123 +6,112 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Configuration DeepSeek
 bot = telebot.TeleBot(os.getenv('TELEGRAM_TOKEN'))
-DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
-DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"  # À vérifier selon la doc DeepSeek
+GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    welcome_text = """
-🤖 **Bot DeepSeek IA Actif !**
+    welcome_text = f"""
+🤖 **Bot Groq IA - Ultra Rapide !** ⚡
 
-🎯 **Commandes disponibles :**
-/start - Démarrer le bot
-/help - Aide et informations
-/model - Informations sur le modèle
+🎯 **Commandes :**
+/start - Démarrer
+/help - Aide
+/info - Infos techniques
+
+🧠 **Modèle :** Llama2-70b
+⚡ **Vitesse :** Réponses en 1-2 secondes
+🔧 **Statut :** ✅ Groq Connecté
 
 💬 **Posez-moi n'importe quelle question !**
-
-🔧 *Configuration DeepSeek :* ✅
     """
     bot.reply_to(message, welcome_text)
 
 @bot.message_handler(commands=['help'])
 def help_command(message):
     help_text = """
-🆘 **Aide - Bot DeepSeek**
+🆘 **Aide - Bot Groq IA**
 
-• Posez des questions normalement
-• Le bot utilise l'API DeepSeek
-• Réponses en temps réel
-• Support technique inclus
+• Réponses ultra-rapides (1-2s)
+• Modèle Llama2-70b
+• Support multilingue
+• Conversation fluide
 
-📝 **Exemples :**
-"Explique la programmation Python"
-"Qu'est-ce que l'IA générative ?"
-"Aide-moi avec mon code"
+**Exemples :**
+"Explique Python simplement"
+"Comment créer un site web ?"
+"Aide-moi avec mes devoirs"
     """
     bot.reply_to(message, help_text)
 
-@bot.message_handler(commands=['model'])
-def model_info(message):
+@bot.message_handler(commands=['info'])
+def info_command(message):
     info_text = """
-🧠 **Informations Modèle :**
+🧠 **Informations Techniques :**
 
-• **Fournisseur :** DeepSeek AI
-• **Type :** Modèle de langage avancé
-• **Capacités :** Code, texte, analyse
-• **Statut :** ✅ Opérationnel
+• **API :** Groq
+• **Modèle :** Llama2-70b
+• **Vitesse :** ⚡ Ultra-rapide
+• **Gratuit :** ✅ Oui
+• **Limites :** Quotas généreux
     """
     bot.reply_to(message, info_text)
 
 @bot.message_handler(func=lambda message: True)
-def reply(message):
+def handle_message(message):
     try:
-        # Indicateur de frappe
         bot.send_chat_action(message.chat.id, 'typing')
         
-        # Vérifier la clé API
-        if not DEEPSEEK_API_KEY:
-            bot.reply_to(message, "❌ Erreur: Clé API DeepSeek non configurée")
-            return
-
-        # Headers pour l'API DeepSeek
+        # Préparer requête Groq
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {DEEPSEEK_API_KEY}"
+            "Authorization": f"Bearer {GROQ_API_KEY}"
         }
 
-        # Données pour la requête
         payload = {
-            "model": "deepseek-chat",  # À adapter selon le modèle DeepSeek
             "messages": [
                 {
                     "role": "system", 
-                    "content": "Tu es un assistant IA utile et précis. Réponds en français de manière claire et concise."
+                    "content": "Tu es un assistant IA utile et concis. Réponds en français de manière claire. Sois direct et évite les introductions trop longues."
                 },
                 {
                     "role": "user", 
                     "content": message.text
                 }
             ],
-            "max_tokens": 1000,
-            "temperature": 0.7
+            "model": "llama2-70b-4096",  # Modèle Groq
+            "temperature": 0.7,
+            "max_tokens": 1024,
+            "top_p": 1,
+            "stream": False
         }
 
-        # Envoyer la requête à l'API DeepSeek
-        response = requests.post(DEEPSEEK_API_URL, json=payload, headers=headers, timeout=30)
+        # Envoyer requête
+        response = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=10)
         
-        # Vérifier la réponse
         if response.status_code == 200:
             data = response.json()
             answer = data["choices"][0]["message"]["content"]
             bot.reply_to(message, answer)
+            
+        elif response.status_code == 401:
+            bot.reply_to(message, "❌ Clé API Groq invalide")
+            
+        elif response.status_code == 429:
+            bot.reply_to(message, "⏰ Trop de requêtes. Réessayez dans 1 minute.")
+            
         else:
-            error_msg = f"❌ Erreur API: {response.status_code} - {response.text}"
-            bot.reply_to(message, error_msg)
+            bot.reply_to(message, f"❌ Erreur Groq: {response.status_code}")
 
     except requests.exceptions.Timeout:
-        bot.reply_to(message, "⏰ Délai d'attente dépassé. Veuillez réessayer.")
-    
-    except requests.exceptions.ConnectionError:
-        bot.reply_to(message, "🔌 Erreur de connexion. Vérifiez votre internet.")
-    
+        bot.reply_to(message, "⏰ Timeout - Groq est normalement très rapide!")
+        
     except Exception as e:
-        error_message = f"❌ Erreur: {str(e)}"
-        # Version raccourcie pour les erreurs longues
-        if len(error_message) > 400:
-            error_message = "❌ Erreur interne. Veuillez réessayer."
-        bot.reply_to(message, error_message)
+        bot.reply_to(message, f"❌ Erreur: {str(e)}")
 
-# Message de démarrage
-print("🚀 Bot DeepSeek démarré...")
-print(f"📁 Dossier: {os.getcwd()}")
+print("🚀 Bot Groq démarré...")
 print(f"🔑 Token Telegram: {'✅' if os.getenv('TELEGRAM_TOKEN') else '❌'}")
-print(f"🧠 Clé DeepSeek: {'✅' if DEEPSEEK_API_KEY else '❌'}")
+print(f"⚡ Clé Groq: {'✅' if GROQ_API_KEY else '❌'}")
 
-# Démarrer le bot
-try:
-    bot.infinity_polling()
-except Exception as e:
-    print(f"❌ Erreur démarrage bot: {e}")
+bot.infinity_polling()
