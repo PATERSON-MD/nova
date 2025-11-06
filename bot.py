@@ -14,7 +14,7 @@ GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 # 👑 IDENTITÉ DU CRÉATEUR
 CREATOR = "@soszoe"
-BOT_NAME = "KervensAI"
+BOT_NAME = "Nova"
 
 # 🖼️ GALERIE D'IMAGES
 IMAGE_GALLERY = [
