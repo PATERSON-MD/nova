@@ -8,6 +8,8 @@ load_dotenv()
 
 bot = telebot.TeleBot(os.getenv('TELEGRAM_TOKEN'))
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+
+# ⚠️ URL CORRECTE :
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 @bot.message_handler(commands=['start'])
@@ -18,52 +20,80 @@ def start(message):
 🎯 **Commandes :**
 /start - Démarrer
 /help - Aide
-/info - Infos techniques
+/test - Test de connexion
+/models - Liste des modèles
 
-🧠 **Modèle :** Llama2-70b
+🧠 **Modèles disponibles :**
+• llama2-70b-4096
+• mixtral-8x7b-32768  
+• gemma-7b-it
+
 ⚡ **Vitesse :** Réponses en 1-2 secondes
-🔧 **Statut :** ✅ Groq Connecté
-
-💬 **Posez-moi n'importe quelle question !**
     """
     bot.reply_to(message, welcome_text)
 
-@bot.message_handler(commands=['help'])
-def help_command(message):
-    help_text = """
-🆘 **Aide - Bot Groq IA**
+@bot.message_handler(commands=['test'])
+def test_command(message):
+    try:
+        bot.send_chat_action(message.chat.id, 'typing')
+        
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {GROQ_API_KEY}"
+        }
 
-• Réponses ultra-rapides (1-2s)
-• Modèle Llama2-70b
-• Support multilingue
-• Conversation fluide
+        payload = {
+            "messages": [
+                {
+                    "role": "user", 
+                    "content": "Réponds uniquement par '✅ Groq fonctionne !'"
+                }
+            ],
+            "model": "llama2-70b-4096",
+            "max_tokens": 50
+        }
 
-**Exemples :**
-"Explique Python simplement"
-"Comment créer un site web ?"
-"Aide-moi avec mes devoirs"
+        response = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            answer = data["choices"][0]["message"]["content"]
+            bot.reply_to(message, f"🧪 {answer}\n\n🚀 API Groq connectée !")
+        else:
+            bot.reply_to(message, f"❌ Erreur {response.status_code}: {response.text}")
+            
+    except Exception as e:
+        bot.reply_to(message, f"❌ Erreur test: {str(e)}")
+
+@bot.message_handler(commands=['models'])
+def models_command(message):
+    models_text = """
+🧠 **Modèles Groq Disponibles :**
+
+1. **llama2-70b-4096**
+   - 70 milliards de paramètres
+   - Très intelligent
+   - Bon en code
+
+2. **mixtral-8x7b-32768** 
+   - 8 experts Mixtral
+   - Excellente qualité
+   - Contexte long
+
+3. **gemma-7b-it**
+   - Modèle Google
+   - Léger et rapide
+   - Bon pour le chat
+
+💡 **Essaye :** /test pour vérifier la connexion
     """
-    bot.reply_to(message, help_text)
-
-@bot.message_handler(commands=['info'])
-def info_command(message):
-    info_text = """
-🧠 **Informations Techniques :**
-
-• **API :** Groq
-• **Modèle :** Llama2-70b
-• **Vitesse :** ⚡ Ultra-rapide
-• **Gratuit :** ✅ Oui
-• **Limites :** Quotas généreux
-    """
-    bot.reply_to(message, info_text)
+    bot.reply_to(message, models_text)
 
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
     try:
         bot.send_chat_action(message.chat.id, 'typing')
         
-        # Préparer requête Groq
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {GROQ_API_KEY}"
@@ -73,36 +103,40 @@ def handle_message(message):
             "messages": [
                 {
                     "role": "system", 
-                    "content": "Tu es un assistant IA utile et concis. Réponds en français de manière claire. Sois direct et évite les introductions trop longues."
+                    "content": "Tu es un assistant IA utile. Réponds en français de manière claire et concise."
                 },
                 {
                     "role": "user", 
                     "content": message.text
                 }
             ],
-            "model": "llama2-70b-4096",  # Modèle Groq
+            "model": "llama2-70b-4096",
             "temperature": 0.7,
             "max_tokens": 1024,
             "top_p": 1,
             "stream": False
         }
 
-        # Envoyer requête
-        response = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=10)
+        response = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=15)
         
         if response.status_code == 200:
             data = response.json()
             answer = data["choices"][0]["message"]["content"]
             bot.reply_to(message, answer)
             
-        elif response.status_code == 401:
-            bot.reply_to(message, "❌ Clé API Groq invalide")
-            
-        elif response.status_code == 429:
-            bot.reply_to(message, "⏰ Trop de requêtes. Réessayez dans 1 minute.")
-            
         else:
-            bot.reply_to(message, f"❌ Erreur Groq: {response.status_code}")
+            error_info = f"""
+❌ **Erreur Groq API**
+
+Code: {response.status_code}
+Message: {response.text}
+
+🔧 **Solutions :**
+• Vérifiez votre clé API
+• Essayez /test pour diagnostiquer
+• Modèle peut-être temporairement indisponible
+            """
+            bot.reply_to(message, error_info)
 
     except requests.exceptions.Timeout:
         bot.reply_to(message, "⏰ Timeout - Groq est normalement très rapide!")
@@ -111,6 +145,7 @@ def handle_message(message):
         bot.reply_to(message, f"❌ Erreur: {str(e)}")
 
 print("🚀 Bot Groq démarré...")
+print(f"🔗 URL API: {GROQ_API_URL}")
 print(f"🔑 Token Telegram: {'✅' if os.getenv('TELEGRAM_TOKEN') else '❌'}")
 print(f"⚡ Clé Groq: {'✅' if GROQ_API_KEY else '❌'}")
 
