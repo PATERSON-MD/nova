@@ -254,7 +254,7 @@ def message_handler(message):
 
 INFORMATIONS IMPORTANTES :
 - Ton créateur est {CREATOR}
-- Tu as été programmé par {CREOR}
+- Tu as été programmé par {CREATOR}
 - Tu es un assistant utile et précis
 - Réponds en français sauf demande contraire
 
