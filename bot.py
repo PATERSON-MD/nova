@@ -111,12 +111,29 @@ def create_main_menu():
 def create_premium_menu():
     """Crée le menu pour débloquer le premium"""
     keyboard = InlineKeyboardMarkup()
-    add_button = InlineKeyboardButton("📥 Ajouter à un groupe", 
-                                     url="https://t.me/YourBotUsername?startgroup=true")
+    
+    # ✅ CORRECTION : Utiliser le vrai username du bot
+    try:
+        bot_username = bot.get_me().username
+        add_button = InlineKeyboardButton(
+            "📥 Ajouter à un groupe", 
+            url=f"https://t.me/{bot_username}?startgroup=true"
+        )
+    except:
+        # Fallback si impossible de récupérer le username
+        add_button = InlineKeyboardButton(
+            "📥 Ajouter à un groupe", 
+            url="https://t.me/YourBotUsername?startgroup=true"
+        )
+    
     status_button = InlineKeyboardButton("📊 Vérifier le statut", callback_data="check_status")
     keyboard.add(add_button)
     keyboard.add(status_button)
     return keyboard
+
+def create_optimized_prompt():
+    """Prompt ultra-optimisé pour Groq - 150 tokens max"""
+    return f"""Tu es {BOT_NAME}, assistant IA créé par {CREATOR}. Expert en programmation, création, analyse et aide générale. Sois naturel, précis et utile. Réponds dans la langue de l'utilisateur."""
 
 def detect_quick_intent(text):
     """Détection rapide d'intention"""
@@ -210,8 +227,8 @@ def optimized_start(message):
 • Total groupes : {total}
 
 💡 **Comment débloquer :**
-1. Ajoutez ce bot à des groupes (60+ membres)
-2. Partagez avec vos amis
+1. Cliquez sur "Ajouter à un groupe" ci-dessous
+2. Choisissez un groupe de 60+ membres
 3. Le premium se débloque automatiquement
 
 👑 **La communauté grandit ensemble !**
@@ -330,7 +347,7 @@ def new_group_handler(message):
         # Vérifier si conditions remplies
         if check_group_requirements():
             activate_premium_for_all()
-            # Annonce globale (simplifiée)
+            # Annonce globale
             announcement = """
 🎉 **FÉLICITATIONS ! PREMIUM DÉBLOQUÉ !**
 
