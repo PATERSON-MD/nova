@@ -7,6 +7,7 @@ import re
 import time
 from datetime import datetime
 from dotenv import load_dotenv
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 load_dotenv()
 
@@ -20,12 +21,8 @@ CREATOR = "👑 Soszoe"
 BOT_NAME = "🚀 KervensAI Pro"
 VERSION = "💎 Édition Groq Optimisée"
 
-# 🎨 TES PHOTOS
-IMAGE_GALLERY = [
-    "https://files.catbox.moe/601u5z.jpg",
-    "https://files.catbox.moe/qmxfpk.jpg",  
-    "https://files.catbox.moe/77iazb.jpg",
-]
+# 🎨 VOTRE PHOTO PRINCIPALE
+MAIN_PHOTO = "https://files.catbox.moe/601u5z.jpg"  # Remplacez par votre meilleure photo
 
 # ⚡ MODÈLE OPTIMISÉ
 current_model = "llama-3.1-8b-instant"  # Plus rapide et stable
@@ -48,6 +45,13 @@ def get_user_session(user_id):
         }
     return user_sessions[user_id]
 
+def create_main_menu():
+    """Crée le menu avec bouton Support Créateur"""
+    keyboard = InlineKeyboardMarkup()
+    support_button = InlineKeyboardButton("💝 Support Créateur", url="https://t.me/Soszoe")  # Remplacez par votre lien
+    keyboard.add(support_button)
+    return keyboard
+
 def detect_quick_intent(text):
     """Détection rapide d'intention"""
     text_lower = text.lower()
@@ -64,11 +68,24 @@ def should_send_photo(intent):
 # ==================== COMMANDES OPTIMISÉES ====================
 @bot.message_handler(commands=['start', 'aide'])
 def optimized_start(message):
-    """Menu optimisé"""
+    """Menu optimisé avec votre photo"""
+    try:
+        # Envoi de votre photo avec légende
+        bot.send_photo(
+            message.chat.id, 
+            MAIN_PHOTO,
+            caption=f"📸 **{CREATOR}** - Créateur du bot\n*Votre expert en IA* 👑",
+            parse_mode='Markdown'
+        )
+        time.sleep(0.5)
+    except Exception as e:
+        print(f"Photo non chargée: {e}")
+    
+    # Menu principal
     menu = f"""
 🤖 **{BOT_NAME}** - {VERSION}
 
-👑 Créé par {CREATOR}
+👑 **Créé par {CREATOR}**
 🚀 Assistant IA optimisé pour Groq
 
 💫 **Je peux t'aider avec :**
@@ -85,27 +102,47 @@ def optimized_start(message):
 "Traduis ce texte..."
 
 ✨ **Simple, rapide, efficace !**
+
+👇 **Supportez le créateur :**
 """
-    bot.send_message(message.chat.id, menu, parse_mode='Markdown')
-    
-    if IMAGE_GALLERY and random.random() < 0.3:
-        try:
-            bot.send_photo(message.chat.id, random.choice(IMAGE_GALLERY),
-                         caption="📸 Une de mes photos !")
-        except:
-            pass
+    bot.send_message(
+        message.chat.id, 
+        menu, 
+        parse_mode='Markdown',
+        reply_markup=create_main_menu()
+    )
 
 @bot.message_handler(commands=['photo'])
 def photo_handler(message):
-    """Gestionnaire photo optimisé"""
-    if IMAGE_GALLERY:
-        try:
-            bot.send_photo(message.chat.id, random.choice(IMAGE_GALLERY),
-                         caption=f"📸 **Photo de {CREATOR}**")
-        except:
-            bot.send_message(message.chat.id, "❌ Erreur photo")
-    else:
-        bot.send_message(message.chat.id, "📸 Aucune photo configurée")
+    """Affiche votre photo avec bouton support"""
+    try:
+        bot.send_photo(
+            message.chat.id, 
+            MAIN_PHOTO,
+            caption=f"📸 **{CREATOR}** - Créateur du bot\n*Merci pour votre support !* 💝",
+            parse_mode='Markdown',
+            reply_markup=create_main_menu()
+        )
+    except:
+        bot.send_message(message.chat.id, "❌ Erreur lors du chargement de la photo")
+
+@bot.message_handler(commands=['support'])
+def support_handler(message):
+    """Commande dédiée pour le support"""
+    support_text = f"""
+💝 **Support {CREATOR}**
+
+Merci de soutenir mon travail ! 
+Votre support m'aide à améliorer ce bot et à créer de nouveaux projets.
+
+👇 **Cliquez ci-dessous pour me contacter :**
+"""
+    bot.send_message(
+        message.chat.id,
+        support_text,
+        parse_mode='Markdown',
+        reply_markup=create_main_menu()
+    )
 
 @bot.message_handler(commands=['reset'])
 def reset_handler(message):
@@ -188,12 +225,17 @@ def optimized_ai_handler(message):
                 # RÉPONSE NORMALE
                 bot.reply_to(message, answer)
             
-            # PHOTO CONTEXTUELLE OPTIMISÉE
-            if IMAGE_GALLERY and should_send_photo(intent):
+            # PHOTO CONTEXTUELLE AVEC BOUTON SUPPORT
+            if should_send_photo(intent):
                 try:
-                    time.sleep(0.3)
-                    bot.send_photo(message.chat.id, random.choice(IMAGE_GALLERY),
-                                 caption="📸 Photo partagée !")
+                    time.sleep(0.5)
+                    bot.send_photo(
+                        message.chat.id, 
+                        MAIN_PHOTO,
+                        caption=f"📸 **{CREATOR}** - Merci pour votre confiance ! 💝",
+                        parse_mode='Markdown',
+                        reply_markup=create_main_menu()
+                    )
                 except:
                     pass
                 
@@ -230,15 +272,17 @@ if __name__ == "__main__":
     print(f"""
 🎯 {BOT_NAME} - {VERSION}
 👑 Créateur : {CREATOR}
+📸 Photo intégrée dans le menu
+💝 Bouton Support Créateur activé
 ⚡ Modèle : {current_model}
 🔒 Statut : OPTIMISÉ POUR GROQ
 
 💫 **Optimisations appliquées :**
+✓ Votre photo dans le menu start
+✓ Bouton Support Créateur
 ✓ Prompt : 150 tokens max
 ✓ Contexte : 2 messages
 ✓ Tokens : 800 max par requête
-✓ Timeout : 15 secondes
-✓ Historique : 6 messages max
 
 🚀 **Garanti sans erreur 400 !**
     """)
