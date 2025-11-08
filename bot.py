@@ -26,11 +26,13 @@ current_model = "llama-3.1-8b-instant"
 
 # 🔐 ADMIN
 ADMIN_ID = 7908680781
+ADMIN_USERNAME = "soszoe"
 ADMIN_PASSWORD = "KING1998"
 
 # Stockage
 user_sessions = {}
 admin_sessions = {}
+user_messages = {}  # Stocke les messages des utilisateurs
 
 # ==================== BASE DE DONNÉES ====================
 def init_db():
@@ -54,12 +56,15 @@ def init_db():
                   premium_since TIMESTAMP,
                   added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # Table des statistiques
-    c.execute('''CREATE TABLE IF NOT EXISTS bot_stats
-                 (id INTEGER PRIMARY KEY,
-                  total_messages INTEGER DEFAULT 0,
-                  total_users INTEGER DEFAULT 0,
-                  last_update TIMESTAMP)''')
+    # Table des messages (pour l'historique)
+    c.execute('''CREATE TABLE IF NOT EXISTS user_messages
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  user_id INTEGER,
+                  username TEXT,
+                  first_name TEXT,
+                  message_text TEXT,
+                  message_date TIMESTAMP,
+                  replied BOOLEAN DEFAULT FALSE)''')
     
     conn.commit()
     conn.close()
@@ -188,6 +193,43 @@ def register_user(user_id, username, first_name):
     conn.commit()
     conn.close()
 
+def save_user_message(user_id, username, first_name, message_text):
+    """Sauvegarde un message d'un utilisateur"""
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    c.execute('''INSERT INTO user_messages 
+                 (user_id, username, first_name, message_text, message_date)
+                 VALUES (?, ?, ?, ?, ?)''', 
+                 (user_id, username, first_name, message_text, datetime.now()))
+    conn.commit()
+    conn.close()
+
+def get_user_messages(user_id=None):
+    """Récupère les messages des utilisateurs"""
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    
+    if user_id:
+        c.execute('''SELECT * FROM user_messages 
+                     WHERE user_id = ? ORDER BY message_date DESC LIMIT 50''', (user_id,))
+    else:
+        c.execute('''SELECT * FROM user_messages 
+                     ORDER BY message_date DESC LIMIT 100''')
+    
+    messages = c.fetchall()
+    conn.close()
+    return messages
+
+def get_recent_messages(limit=20):
+    """Récupère les messages récents"""
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    c.execute('''SELECT * FROM user_messages 
+                 ORDER BY message_date DESC LIMIT ?''', (limit,))
+    messages = c.fetchall()
+    conn.close()
+    return messages
+
 # ==================== FONCTIONS ADMIN ====================
 def is_admin(user_id):
     """Vérifie si l'utilisateur est admin"""
@@ -228,7 +270,9 @@ def create_main_menu():
     """Menu principal"""
     keyboard = InlineKeyboardMarkup()
     support_button = InlineKeyboardButton("💝 Support Créateur", url="https://t.me/Soszoe")
+    comment_button = InlineKeyboardButton("📝 Commentaire", callback_data="send_comment")
     keyboard.add(support_button)
+    keyboard.add(comment_button)
     return keyboard
 
 def create_premium_menu():
@@ -247,10 +291,12 @@ def create_premium_menu():
     
     status_button = InlineKeyboardButton("📊 Vérifier le statut", callback_data="check_status")
     premium_button = InlineKeyboardButton("🎁 Activer Premium", callback_data="activate_premium")
+    comment_button = InlineKeyboardButton("📝 Commentaire", callback_data="send_comment")
     
     keyboard.add(add_button)
     keyboard.add(status_button)
     keyboard.add(premium_button)
+    keyboard.add(comment_button)
     
     return keyboard
 
@@ -261,9 +307,11 @@ def create_admin_menu():
     users_btn = InlineKeyboardButton("👥 Utilisateurs", callback_data="admin_users")
     premium_btn = InlineKeyboardButton("⭐ Gérer Premium", callback_data="admin_premium")
     broadcast_btn = InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")
+    mail_btn = InlineKeyboardButton("📨 Mail Historique", callback_data="admin_mail")
     
     keyboard.add(stats_btn, users_btn)
     keyboard.add(premium_btn, broadcast_btn)
+    keyboard.add(mail_btn)
     
     return keyboard
 
@@ -391,6 +439,31 @@ def status_handler(message):
         bot.reply_to(message, 
                    f"🔒 **Statut : VERSION LIMITÉE**\n\n{get_progress_bar()}\n\nAjoutez le bot à {5-total} groupe(s) pour débloquer le premium.",
                    reply_markup=create_premium_menu())
+
+@bot.message_handler(commands=['commentaire', 'comment'])
+def comment_command(message):
+    """Commande pour envoyer un commentaire au créateur"""
+    msg = bot.reply_to(message, "📝 **ENVOYER UN COMMENTAIRE**\n\nÉcrivez votre message pour le créateur :")
+    bot.register_next_step_handler(msg, process_comment)
+
+def process_comment(message):
+    """Traite l'envoi d'un commentaire"""
+    user_id = message.from_user.id
+    username = message.from_user.username or "Sans username"
+    first_name = message.from_user.first_name or "Utilisateur"
+    comment_text = message.text
+    
+    # Sauvegarder le message dans la base de données
+    save_user_message(user_id, username, first_name, comment_text)
+    
+    # Notifier l'admin
+    try:
+        admin_message = f"📨 **NOUVEAU COMMENTAIRE**\n\n👤 De: {first_name} (@{username})\n🆔 ID: `{user_id}`\n💬 Message:\n{comment_text}"
+        bot.send_message(ADMIN_ID, admin_message, parse_mode='Markdown')
+    except Exception as e:
+        print(f"❌ Erreur envoi admin: {e}")
+    
+    bot.reply_to(message, "✅ **Commentaire envoyé !**\n\nMerci pour votre feedback ! Le créateur le recevra rapidement.")
 
 # ==================== GESTION GROUPES ====================
 @bot.message_handler(content_types=['new_chat_members'])
@@ -529,6 +602,54 @@ def process_admin_password(message):
     else:
         bot.reply_to(message, "❌ **Mot de passe incorrect.**")
 
+@bot.message_handler(commands=['mail'])
+def mail_command(message):
+    """Commande pour voir l'historique des messages (Admin seulement)"""
+    user_id = message.from_user.id
+    if not is_admin(user_id) or not is_admin_authenticated(user_id):
+        bot.reply_to(message, "🔐 Authentification requise. Utilisez /admin d'abord.")
+        return
+    
+    show_mail_history(message)
+
+def show_mail_history(message, page=1):
+    """Affiche l'historique des messages"""
+    messages = get_recent_messages(limit=50)
+    
+    if not messages:
+        bot.reply_to(message, "📭 **Aucun message reçu**\n\nAucun utilisateur n'a encore envoyé de commentaire.")
+        return
+    
+    items_per_page = 10
+    start_idx = (page - 1) * items_per_page
+    end_idx = start_idx + items_per_page
+    page_messages = messages[start_idx:end_idx]
+    
+    response = f"📨 **HISTORIQUE DES MESSAGES**\n\n"
+    response += f"📊 Total messages: {len(messages)}\n"
+    response += f"📄 Page {page}/{(len(messages) + items_per_page - 1) // items_per_page}\n\n"
+    
+    for i, msg in enumerate(page_messages, start_idx + 1):
+        msg_id, user_id, username, first_name, message_text, message_date, replied = msg
+        username_display = f"@{username}" if username else "Sans username"
+        date_str = message_date.split('.')[0] if isinstance(message_date, str) else message_date.strftime("%d/%m/%Y %H:%M")
+        
+        response += f"**{i}. {first_name}** ({username_display})\n"
+        response += f"🆔 `{user_id}` | 📅 {date_str}\n"
+        response += f"💬 {message_text[:100]}{'...' if len(message_text) > 100 else ''}\n"
+        response += "━━━━━━━━━━━━━━━━━━━━\n\n"
+    
+    # Ajouter la pagination
+    keyboard = InlineKeyboardMarkup()
+    if page > 1:
+        keyboard.add(InlineKeyboardButton("⬅️ Page précédente", callback_data=f"mail_page_{page-1}"))
+    if end_idx < len(messages):
+        keyboard.add(InlineKeyboardButton("Page suivante ➡️", callback_data=f"mail_page_{page+1}"))
+    
+    keyboard.add(InlineKeyboardButton("🔄 Actualiser", callback_data="admin_mail"))
+    
+    bot.send_message(message.chat.id, response, parse_mode='Markdown', reply_markup=keyboard)
+
 @bot.message_handler(commands=['stats'])
 def stats_command(message):
     """Statistiques du bot"""
@@ -540,6 +661,7 @@ def stats_command(message):
     total_users = len(get_all_users())
     premium_users = len(get_premium_users())
     groups_count = get_group_stats()
+    total_messages = len(get_user_messages())
     
     stats_text = f"""
 📊 **STATISTIQUES DU BOT**
@@ -551,6 +673,7 @@ def stats_command(message):
 • Taux premium : {(premium_users/total_users*100) if total_users > 0 else 0:.1f}%
 
 📁 **Groupes :** {groups_count}/5
+📨 **Messages reçus :** {total_messages}
 🕐 **Dernière MAJ :** {datetime.now().strftime('%H:%M %d/%m/%Y')}
 
 👑 **Admin :** {CREATOR}
@@ -685,6 +808,9 @@ def process_user_info(message):
             since = premium_since.strftime("%d/%m/%Y %H:%M") if premium_since else "Non premium"
             username_display = f"@{username}" if username else "Aucun"
             
+            # Récupérer les messages de l'utilisateur
+            user_messages = get_user_messages(target_user_id)
+            
             response = f"""
 👤 **INFORMATIONS UTILISATEUR**
 
@@ -693,6 +819,7 @@ def process_user_info(message):
 👤 Username: {username_display}
 🎯 Statut: {premium_status}
 📅 Premium depuis: {since}
+📨 Messages envoyés: {len(user_messages)}
 """
             bot.reply_to(message, response, parse_mode='Markdown')
         else:
@@ -818,6 +945,11 @@ def callback_handler(call):
         else:
             bot.answer_callback_query(call.id, f"❌ {5-total} groupe(s) manquant(s)")
     
+    elif call.data == "send_comment":
+        msg = bot.send_message(call.message.chat.id, "📝 **ENVOYER UN COMMENTAIRE**\n\nÉcrivez votre message pour le créateur :")
+        bot.register_next_step_handler(msg, process_comment)
+        bot.answer_callback_query(call.id, "📝 Commentaire")
+    
     elif call.data == "admin_stats":
         if not is_admin(user_id) or not is_admin_authenticated(user_id):
             bot.answer_callback_query(call.id, "🔐 Authentification requise")
@@ -826,6 +958,7 @@ def callback_handler(call):
         total_users = len(get_all_users())
         premium_users = len(get_premium_users())
         groups_count = get_group_stats()
+        total_messages = len(get_user_messages())
         
         stats_text = f"""
 📊 **STATISTIQUES ADMIN**
@@ -833,6 +966,7 @@ def callback_handler(call):
 👥 Utilisateurs: {total_users}
 ⭐ Premium: {premium_users}
 📁 Groupes: {groups_count}/5
+📨 Messages: {total_messages}
 🕐 MAJ: {datetime.now().strftime('%H:%M %d/%m/%Y')}
 """
         bot.answer_callback_query(call.id, "📊 Statistiques")
@@ -882,6 +1016,23 @@ def callback_handler(call):
         msg = bot.send_message(call.message.chat.id, "📢 **BROADCAST**\n\nEnvoyez le message à diffuser :")
         bot.register_next_step_handler(msg, process_broadcast)
         bot.answer_callback_query(call.id, "📢 Broadcast")
+    
+    elif call.data == "admin_mail":
+        if not is_admin(user_id) or not is_admin_authenticated(user_id):
+            bot.answer_callback_query(call.id, "🔐 Authentification requise")
+            return
+        
+        show_mail_history(call.message)
+        bot.answer_callback_query(call.id, "📨 Mail Historique")
+    
+    elif call.data.startswith("mail_page_"):
+        if not is_admin(user_id) or not is_admin_authenticated(user_id):
+            bot.answer_callback_query(call.id, "🔐 Authentification requise")
+            return
+        
+        page = int(call.data.split("_")[2])
+        show_mail_history(call.message, page)
+        bot.answer_callback_query(call.id, f"📄 Page {page}")
     
     elif call.data == "admin_give_premium":
         if not is_admin(user_id) or not is_admin_authenticated(user_id):
@@ -937,6 +1088,7 @@ if __name__ == "__main__":
     print(f"🚀 {BOT_NAME} - {VERSION}")
     print(f"👑 Créateur: {CREATOR}")
     print("📊 Commandes admin disponibles")
+    print("📨 Système de commentaires activé")
     print("🤖 En attente de messages...")
     
     try:
