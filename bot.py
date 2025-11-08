@@ -249,6 +249,38 @@ def is_admin_authenticated(user_id):
         return False
     return session['authenticated']
 
+def require_admin_auth(func):
+    """Décorateur pour exiger l'authentification admin"""
+    def wrapper(message):
+        user_id = message.from_user.id
+        if not is_admin(user_id):
+            bot.reply_to(message, "❌ Accès réservé au propriétaire.")
+            return
+        
+        if not is_admin_authenticated(user_id):
+            msg = bot.reply_to(message, "🔐 **Authentification requise**\n\nVeuillez entrer le mot de passe admin :")
+            bot.register_next_step_handler(msg, process_admin_auth_for_command, func, message)
+            return
+        
+        # Si authentifié, exécuter la commande
+        func(message)
+    
+    return wrapper
+
+def process_admin_auth_for_command(message, original_func, original_message):
+    """Traite l'authentification pour une commande spécifique"""
+    user_id = message.from_user.id
+    if not is_admin(user_id):
+        return
+    
+    if verify_admin_password(message.text.strip()):
+        admin_sessions[user_id] = {'authenticated': True, 'auth_time': datetime.now()}
+        bot.send_message(message.chat.id, "✅ **Authentification réussie !**")
+        # Exécuter la commande originale après authentification
+        original_func(original_message)
+    else:
+        bot.reply_to(message, "❌ **Mot de passe incorrect.**\n\nUtilisez à nouveau la commande admin.")
+
 # ==================== FONCTIONS UTILISATEURS ====================
 def get_user_session(user_id):
     """Gère les sessions utilisateur"""
@@ -323,42 +355,6 @@ def create_admin_menu():
     keyboard.add(premium_btn, broadcast_btn)
     keyboard.add(mail_btn, commands_btn)
     keyboard.add(help_btn)
-    
-    return keyboard
-
-def create_admin_commands_menu():
-    """Menu détaillé des commandes admin"""
-    keyboard = InlineKeyboardMarkup()
-    
-    # Ligne 1 - Statistiques
-    stats_btn = InlineKeyboardButton("📊 /stats", callback_data="admin_stats")
-    users_btn = InlineKeyboardButton("👥 /users", callback_data="admin_users")
-    
-    # Ligne 2 - Utilisateurs
-    premium_users_btn = InlineKeyboardButton("⭐ /premium_users", callback_data="admin_premium_users_cmd")
-    user_info_btn = InlineKeyboardButton("👤 /user_info", callback_data="admin_user_info_cmd")
-    
-    # Ligne 3 - Premium
-    give_premium_btn = InlineKeyboardButton("➕ /give_premium", callback_data="admin_give_premium")
-    remove_premium_btn = InlineKeyboardButton("➖ /remove_premium", callback_data="admin_remove_premium")
-    
-    # Ligne 4 - Premium Mass
-    premium_all_btn = InlineKeyboardButton("🎯 /premium_all", callback_data="admin_premium_all_cmd")
-    remove_all_premium_btn = InlineKeyboardButton("🗑️ /remove_all_premium", callback_data="admin_remove_all_premium_cmd")
-    
-    # Ligne 5 - Communication
-    broadcast_btn = InlineKeyboardButton("📢 /broadcast", callback_data="admin_broadcast")
-    mail_btn = InlineKeyboardButton("📨 /mail", callback_data="admin_mail")
-    
-    # Ligne 6 - Retour
-    back_btn = InlineKeyboardButton("🔙 Retour", callback_data="admin_back_main")
-    
-    keyboard.add(stats_btn, users_btn)
-    keyboard.add(premium_users_btn, user_info_btn)
-    keyboard.add(give_premium_btn, remove_premium_btn)
-    keyboard.add(premium_all_btn, remove_all_premium_btn)
-    keyboard.add(broadcast_btn, mail_btn)
-    keyboard.add(back_btn)
     
     return keyboard
 
@@ -650,13 +646,9 @@ def process_admin_password(message):
         bot.reply_to(message, "❌ **Mot de passe incorrect.**")
 
 @bot.message_handler(commands=['mail'])
+@require_admin_auth
 def mail_command(message):
     """Commande pour voir l'historique des messages (Admin seulement)"""
-    user_id = message.from_user.id
-    if not is_admin(user_id) or not is_admin_authenticated(user_id):
-        bot.reply_to(message, "🔐 Authentification requise. Utilisez /admin d'abord.")
-        return
-    
     show_mail_history(message)
 
 def show_mail_history(message, page=1):
@@ -694,18 +686,13 @@ def show_mail_history(message, page=1):
         keyboard.add(InlineKeyboardButton("Page suivante ➡️", callback_data=f"mail_page_{page+1}"))
     
     keyboard.add(InlineKeyboardButton("🔄 Actualiser", callback_data="admin_mail"))
-    keyboard.add(InlineKeyboardButton("🔙 Retour", callback_data="admin_back_main"))
     
     bot.send_message(message.chat.id, response, parse_mode='Markdown', reply_markup=keyboard)
 
 @bot.message_handler(commands=['stats'])
+@require_admin_auth
 def stats_command(message):
     """Statistiques du bot"""
-    user_id = message.from_user.id
-    if not is_admin(user_id) or not is_admin_authenticated(user_id):
-        bot.reply_to(message, "🔐 Authentification requise. Utilisez /admin d'abord.")
-        return
-    
     total_users = len(get_all_users())
     premium_users = len(get_premium_users())
     groups_count = get_group_stats()
@@ -729,13 +716,9 @@ def stats_command(message):
     bot.reply_to(message, stats_text, parse_mode='Markdown')
 
 @bot.message_handler(commands=['users'])
+@require_admin_auth
 def users_command(message):
     """Lister tous les utilisateurs"""
-    user_id = message.from_user.id
-    if not is_admin(user_id) or not is_admin_authenticated(user_id):
-        bot.reply_to(message, "🔐 Authentification requise.")
-        return
-    
     users = get_all_users()
     if not users:
         bot.reply_to(message, "📭 Aucun utilisateur enregistré.")
@@ -754,13 +737,9 @@ def users_command(message):
     bot.reply_to(message, response, parse_mode='Markdown')
 
 @bot.message_handler(commands=['premium_users'])
+@require_admin_auth
 def premium_users_command(message):
     """Lister les utilisateurs premium"""
-    user_id = message.from_user.id
-    if not is_admin(user_id) or not is_admin_authenticated(user_id):
-        bot.reply_to(message, "🔐 Authentification requise.")
-        return
-    
     premium_users = get_premium_users()
     if not premium_users:
         bot.reply_to(message, "⭐ Aucun utilisateur premium.")
@@ -775,13 +754,9 @@ def premium_users_command(message):
     bot.reply_to(message, response, parse_mode='Markdown')
 
 @bot.message_handler(commands=['give_premium'])
+@require_admin_auth
 def give_premium_command(message):
     """Donner le premium à un utilisateur"""
-    user_id = message.from_user.id
-    if not is_admin(user_id) or not is_admin_authenticated(user_id):
-        bot.reply_to(message, "🔐 Authentification requise.")
-        return
-    
     msg = bot.reply_to(message, "⭐ **DONNER PREMIUM**\n\nEnvoyez l'ID de l'utilisateur :")
     bot.register_next_step_handler(msg, process_give_premium)
 
@@ -789,6 +764,7 @@ def process_give_premium(message):
     """Traite l'ajout de premium"""
     user_id = message.from_user.id
     if not is_admin(user_id) or not is_admin_authenticated(user_id):
+        bot.reply_to(message, "🔐 Authentification requise.")
         return
     
     try:
@@ -806,13 +782,9 @@ def process_give_premium(message):
         bot.reply_to(message, "❌ ID utilisateur invalide.")
 
 @bot.message_handler(commands=['remove_premium'])
+@require_admin_auth
 def remove_premium_command(message):
     """Retirer le premium à un utilisateur"""
-    user_id = message.from_user.id
-    if not is_admin(user_id) or not is_admin_authenticated(user_id):
-        bot.reply_to(message, "🔐 Authentification requise.")
-        return
-    
     msg = bot.reply_to(message, "🔒 **RETIRER PREMIUM**\n\nEnvoyez l'ID de l'utilisateur :")
     bot.register_next_step_handler(msg, process_remove_premium)
 
@@ -820,6 +792,7 @@ def process_remove_premium(message):
     """Traite le retrait de premium"""
     user_id = message.from_user.id
     if not is_admin(user_id) or not is_admin_authenticated(user_id):
+        bot.reply_to(message, "🔐 Authentification requise.")
         return
     
     try:
@@ -830,13 +803,9 @@ def process_remove_premium(message):
         bot.reply_to(message, "❌ ID utilisateur invalide.")
 
 @bot.message_handler(commands=['user_info'])
+@require_admin_auth
 def user_info_command(message):
     """Informations sur un utilisateur"""
-    user_id = message.from_user.id
-    if not is_admin(user_id) or not is_admin_authenticated(user_id):
-        bot.reply_to(message, "🔐 Authentification requise.")
-        return
-    
     msg = bot.reply_to(message, "🔍 **INFORMATIONS UTILISATEUR**\n\nEnvoyez l'ID de l'utilisateur :")
     bot.register_next_step_handler(msg, process_user_info)
 
@@ -844,6 +813,7 @@ def process_user_info(message):
     """Traite la recherche d'utilisateur"""
     user_id = message.from_user.id
     if not is_admin(user_id) or not is_admin_authenticated(user_id):
+        bot.reply_to(message, "🔐 Authentification requise.")
         return
     
     try:
@@ -876,13 +846,9 @@ def process_user_info(message):
         bot.reply_to(message, "❌ ID utilisateur invalide.")
 
 @bot.message_handler(commands=['broadcast'])
+@require_admin_auth
 def broadcast_command(message):
     """Envoyer un message à tous les utilisateurs"""
-    user_id = message.from_user.id
-    if not is_admin(user_id) or not is_admin_authenticated(user_id):
-        bot.reply_to(message, "🔐 Authentification requise.")
-        return
-    
     msg = bot.reply_to(message, "📢 **BROADCAST**\n\nEnvoyez le message à diffuser :")
     bot.register_next_step_handler(msg, process_broadcast)
 
@@ -890,6 +856,7 @@ def process_broadcast(message):
     """Traite le broadcast"""
     user_id = message.from_user.id
     if not is_admin(user_id) or not is_admin_authenticated(user_id):
+        bot.reply_to(message, "🔐 Authentification requise.")
         return
     
     broadcast_text = message.text
@@ -931,13 +898,9 @@ def process_broadcast(message):
     bot.send_message(message.chat.id, result_text, parse_mode='Markdown')
 
 @bot.message_handler(commands=['premium_all'])
+@require_admin_auth
 def premium_all_command(message):
     """Activer le premium pour tous"""
-    user_id = message.from_user.id
-    if not is_admin(user_id) or not is_admin_authenticated(user_id):
-        bot.reply_to(message, "🔐 Authentification requise.")
-        return
-    
     users = get_all_users()
     for user in users:
         activate_user_premium(user[0])
@@ -945,13 +908,9 @@ def premium_all_command(message):
     bot.reply_to(message, f"⭐ **Premium activé pour tous les {len(users)} utilisateurs !**")
 
 @bot.message_handler(commands=['remove_all_premium'])
+@require_admin_auth
 def remove_all_premium_command(message):
     """Retirer le premium à tous (sauf admin)"""
-    user_id = message.from_user.id
-    if not is_admin(user_id) or not is_admin_authenticated(user_id):
-        bot.reply_to(message, "🔐 Authentification requise.")
-        return
-    
     users = get_all_users()
     count = 0
     for user in users:
@@ -962,17 +921,9 @@ def remove_all_premium_command(message):
     bot.reply_to(message, f"🔒 **Premium retiré à {count} utilisateurs !**")
 
 @bot.message_handler(commands=['commands', 'cmd'])
+@require_admin_auth
 def admin_commands_command(message):
     """Affiche toutes les commandes admin"""
-    user_id = message.from_user.id
-    if not is_admin(user_id) or not is_admin_authenticated(user_id):
-        bot.reply_to(message, "🔐 Authentification requise.")
-        return
-    
-    show_admin_commands(message)
-
-def show_admin_commands(message):
-    """Affiche le menu des commandes admin"""
     commands_text = """
 🛠️ **TOUTES LES COMMANDES ADMIN**
 
@@ -998,10 +949,10 @@ def show_admin_commands(message):
 `/admin` - Panel d'authentification
 `/commands` - Ce menu des commandes
 
-💡 **ASTUCE :** Utilisez les boutons ci-dessous pour accéder rapidement aux commandes !
+💡 **ASTUCE :** Utilisez `/admin` pour le panel interactif !
 """
     
-    bot.send_message(message.chat.id, commands_text, parse_mode='Markdown', reply_markup=create_admin_commands_menu())
+    bot.reply_to(message, commands_text, parse_mode='Markdown')
 
 # ==================== CALLBACKS ====================
 @bot.callback_query_handler(func=lambda call: True)
@@ -1081,60 +1032,6 @@ def callback_handler(call):
         bot.answer_callback_query(call.id, "👥 Utilisateurs")
         bot.send_message(call.message.chat.id, response, parse_mode='Markdown')
     
-    elif call.data == "admin_premium_users_cmd":
-        if not is_admin(user_id) or not is_admin_authenticated(user_id):
-            bot.answer_callback_query(call.id, "🔐 Authentification requise")
-            return
-        
-        premium_users = get_premium_users()
-        if not premium_users:
-            bot.send_message(call.message.chat.id, "⭐ Aucun utilisateur premium.")
-        else:
-            response = "⭐ **UTILISATEURS PREMIUM**\n\n"
-            for i, user in enumerate(premium_users, 1):
-                user_id, username, first_name = user
-                username_display = f"@{username}" if username else "Sans username"
-                response += f"{i}. {first_name} ({username_display}) - ID: `{user_id}`\n"
-            
-            bot.send_message(call.message.chat.id, response, parse_mode='Markdown')
-        bot.answer_callback_query(call.id, "⭐ Premium Users")
-    
-    elif call.data == "admin_user_info_cmd":
-        if not is_admin(user_id) or not is_admin_authenticated(user_id):
-            bot.answer_callback_query(call.id, "🔐 Authentification requise")
-            return
-        
-        msg = bot.send_message(call.message.chat.id, "🔍 **INFORMATIONS UTILISATEUR**\n\nEnvoyez l'ID de l'utilisateur :")
-        bot.register_next_step_handler(msg, process_user_info)
-        bot.answer_callback_query(call.id, "👤 User Info")
-    
-    elif call.data == "admin_premium_all_cmd":
-        if not is_admin(user_id) or not is_admin_authenticated(user_id):
-            bot.answer_callback_query(call.id, "🔐 Authentification requise")
-            return
-        
-        users = get_all_users()
-        for user in users:
-            activate_user_premium(user[0])
-        
-        bot.answer_callback_query(call.id, "✅ Premium à tous")
-        bot.send_message(call.message.chat.id, f"⭐ **Premium activé pour tous les {len(users)} utilisateurs !**")
-    
-    elif call.data == "admin_remove_all_premium_cmd":
-        if not is_admin(user_id) or not is_admin_authenticated(user_id):
-            bot.answer_callback_query(call.id, "🔐 Authentification requise")
-            return
-        
-        users = get_all_users()
-        count = 0
-        for user in users:
-            if user[0] != ADMIN_ID:
-                deactivate_user_premium(user[0])
-                count += 1
-        
-        bot.answer_callback_query(call.id, "🔒 Premium retiré")
-        bot.send_message(call.message.chat.id, f"🔒 **Premium retiré à {count} utilisateurs !**")
-    
     elif call.data == "admin_premium":
         if not is_admin(user_id) or not is_admin_authenticated(user_id):
             bot.answer_callback_query(call.id, "🔐 Authentification requise")
@@ -1145,11 +1042,9 @@ def callback_handler(call):
         remove_btn = InlineKeyboardButton("➖ Retirer Premium", callback_data="admin_remove_premium")
         all_btn = InlineKeyboardButton("⭐ À Tous", callback_data="admin_premium_all")
         remove_all_btn = InlineKeyboardButton("🔒 Retirer à Tous", callback_data="admin_remove_all_premium")
-        back_btn = InlineKeyboardButton("🔙 Retour", callback_data="admin_back_main")
         
         keyboard.add(give_btn, remove_btn)
         keyboard.add(all_btn, remove_all_btn)
-        keyboard.add(back_btn)
         
         bot.answer_callback_query(call.id, "⭐ Gestion Premium")
         bot.send_message(call.message.chat.id, "⭐ **GESTION PREMIUM**", reply_markup=keyboard)
@@ -1176,7 +1071,7 @@ def callback_handler(call):
             bot.answer_callback_query(call.id, "🔐 Authentification requise")
             return
         
-        show_admin_commands(call.message)
+        admin_commands_command(call.message)
         bot.answer_callback_query(call.id, "🛠️ Commandes")
     
     elif call.data == "admin_help":
@@ -1188,6 +1083,11 @@ def callback_handler(call):
 ❓ **AIDE ADMINISTRATEUR**
 
 💡 **Conseils d'utilisation :**
+
+🔐 **Authentification :**
+- Utilisez `/admin` pour vous authentifier
+- Session valide 30 minutes
+- Mot de passe requis pour toutes les commandes
 
 📊 **Pour les statistiques :**
 - Utilisez `/stats` pour un aperçu général
@@ -1207,11 +1107,6 @@ def callback_handler(call):
 📢 **Communication :**
 - `/broadcast` pour messages massifs
 - Utilisez avec modération
-
-🔧 **Panel interactif :**
-- Utilisez les boutons pour navigation rapide
-- Session admin: 30 minutes
-- Ré-authentifiez avec `/admin` si besoin
 
 🆘 **Support :** Contactez @Soszoe pour assistance
 """
@@ -1271,20 +1166,6 @@ def callback_handler(call):
         
         bot.answer_callback_query(call.id, "🔒 Premium retiré")
         bot.send_message(call.message.chat.id, f"🔒 **Premium retiré à {count} utilisateurs !**")
-    
-    elif call.data == "admin_back_main":
-        if not is_admin(user_id) or not is_admin_authenticated(user_id):
-            bot.answer_callback_query(call.id, "🔐 Authentification requise")
-            return
-        
-        bot.edit_message_text(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            text="👑 **Panel Administrateur**\n\nSélectionnez une option :",
-            parse_mode='Markdown',
-            reply_markup=create_admin_menu()
-        )
-        bot.answer_callback_query(call.id, "🔙 Retour")
 
 # ==================== DÉMARRAGE ====================
 if __name__ == "__main__":
@@ -1294,9 +1175,9 @@ if __name__ == "__main__":
     print("✅ Base de données prête")
     print(f"🚀 {BOT_NAME} - {VERSION}")
     print(f"👑 Créateur: {CREATOR}")
-    print("📊 Commandes admin disponibles")
+    print("🔐 Système d'authentification admin activé")
+    print("📊 Commandes admin sécurisées")
     print("📨 Système de commentaires activé")
-    print("🛠️ Menu des commandes admin intégré")
     print("🤖 En attente de messages...")
     
     try:
