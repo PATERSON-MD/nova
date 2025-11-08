@@ -544,84 +544,13 @@ pour débloquer toutes les fonctionnalités !
         print(f"❌ Erreur start: {e}")
         bot.reply_to(message, "❌ Erreur temporaire. Réessayez.")
 
-@bot.message_handler(commands=['auth', 'login', 'owner', 'admin'])
-def auth_command(message):
-    """Commande d'authentification pour les autres utilisateurs"""
-    user_id = message.from_user.id
-    
-    # Si c'est 7908680781, il est déjà admin permanent
-    if is_owner(user_id):
-        bot.reply_to(message, "👑 **Vous êtes déjà le propriétaire !**\n\nTout est déjà débloqué pour vous.")
-        return
-    
-    msg = bot.reply_to(message, "🔐 **AUTHENTIFICATION ADMIN**\n\nEntrez le mot de passe :")
-    bot.register_next_step_handler(msg, process_auth)
-
-def process_auth(message):
-    """Traite l'authentification pour les autres utilisateurs"""
-    user_id = message.from_user.id
-    username = message.from_user.username or "Sans username"
-    first_name = message.from_user.first_name or "Utilisateur"
-    
-    # Empêcher 7908680781 de s'authentifier (il l'est déjà)
-    if is_owner(user_id):
-        bot.reply_to(message, "👑 **Vous êtes le propriétaire !**\n\nPas besoin d'authentification.")
-        return
-    
-    if verify_admin_password(message.text.strip()):
-        # Authentification réussie pour autres utilisateurs
-        admin_sessions[user_id] = {'authenticated': True, 'auth_time': datetime.now()}
-        activate_user_premium(user_id)
-        
-        print(f"✅ Auth réussie pour {username}")
-        
-        # ⭐⭐ MESSAGE DE BIENVENUE PERSONNALISÉ ⭐⭐
-        welcome_message = f"""
-🎉 **ADMINISTRATEUR BIENVENUE OOOOOO FAIS POUR MOI !** 🎉
-
-👑 **{first_name}**, vous êtes maintenant **ADMINISTRATEUR** !
-
-⭐ **Premium LÉGENDAIRE activé**
-🔓 **Toutes les commandes admin débloquées**
-
-🚀 **Vous pouvez maintenant :**
-• 📊 Voir toutes les statistiques
-• 👥 Gérer tous les utilisateurs
-• ⭐ Donner/retirer le premium
-• 📢 Envoyer des broadcasts
-• 🔧 Utiliser les outils avancés
-
-💎 **Profitez de votre pouvoir !**
-"""
-        
-        send_legendary_photo(message.chat.id, welcome_message, create_owner_menu())
-        
-    else:
-        print(f"❌ Auth échouée pour {username}")
-        bot.reply_to(message, "❌ **Mot de passe incorrect.**\n\nUtilisez `/auth` pour réessayer.")
-
-@bot.message_handler(commands=['logout'])
-def logout_command(message):
-    """Déconnexion admin (sauf pour 7908680781)"""
-    user_id = message.from_user.id
-    
-    # 7908680781 ne peut pas se déconnecter
-    if is_owner(user_id):
-        bot.reply_to(message, "👑 **Vous êtes le propriétaire permanent !**\n\nImpossible de vous déconnecter.")
-        return
-    
-    if user_id in admin_sessions:
-        del admin_sessions[user_id]
-    
-    bot.reply_to(message, "🔓 **Déconnexion réussie !**\n\nSession admin terminée.")
-
-# ==================== COMMANDES ADMIN ====================
+# ==================== COMMANDES DIRECTES POUR 7908680781 ====================
 @bot.message_handler(commands=['stats'])
 def stats_command(message):
-    """Statistiques du bot"""
+    """Statistiques du bot - TOUJOURS accessible pour 7908680781"""
     user_id = message.from_user.id
     
-    # Vérifier les droits admin - 7908680781 a toujours accès
+    # 7908680781 a TOUJOURS accès, pas de vérification nécessaire
     if not is_owner(user_id) and not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nUtilisez `/auth` pour vous authentifier.")
         return
@@ -647,10 +576,10 @@ def stats_command(message):
 
 @bot.message_handler(commands=['users'])
 def users_command(message):
-    """Lister les utilisateurs"""
+    """Lister les utilisateurs - TOUJOURS accessible pour 7908680781"""
     user_id = message.from_user.id
     
-    # 7908680781 a toujours accès
+    # 7908680781 a TOUJOURS accès
     if not is_owner(user_id) and not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nUtilisez `/auth` pour vous authentifier.")
         return
@@ -677,10 +606,10 @@ def users_command(message):
 
 @bot.message_handler(commands=['premium_all'])
 def premium_all_command(message):
-    """Donner le premium à tous"""
+    """Donner le premium à tous - TOUJOURS accessible pour 7908680781"""
     user_id = message.from_user.id
     
-    # 7908680781 a toujours accès
+    # 7908680781 a TOUJOURS accès
     if not is_owner(user_id) and not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nUtilisez `/auth` pour vous authentifier.")
         return
@@ -694,10 +623,10 @@ def premium_all_command(message):
 
 @bot.message_handler(commands=['broadcast'])
 def broadcast_command(message):
-    """Envoyer un message à tous"""
+    """Envoyer un message à tous - TOUJOURS accessible pour 7908680781"""
     user_id = message.from_user.id
     
-    # 7908680781 a toujours accès
+    # 7908680781 a TOUJOURS accès
     if not is_owner(user_id) and not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nUtilisez `/auth` pour vous authentifier.")
         return
@@ -708,7 +637,7 @@ def broadcast_command(message):
 def process_broadcast(message):
     user_id = message.from_user.id
     
-    # 7908680781 a toujours accès
+    # 7908680781 a TOUJOURS accès
     if not is_owner(user_id) and not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 Authentification requise.")
         return
@@ -753,10 +682,10 @@ def process_broadcast(message):
 
 @bot.message_handler(commands=['mail'])
 def mail_command(message):
-    """Voir les messages reçus"""
+    """Voir les messages reçus - TOUJOURS accessible pour 7908680781"""
     user_id = message.from_user.id
     
-    # 7908680781 a toujours accès
+    # 7908680781 a TOUJOURS accès
     if not is_owner(user_id) and not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nUtilisez `/auth` pour vous authentifier.")
         return
@@ -856,11 +785,19 @@ def callback_handler(call):
         
         # Exécuter la commande admin
         if call.data == "admin_stats":
-            stats_command(call.message)
+            # Pour 7908680781, exécuter directement
+            if is_owner(user_id):
+                stats_command(call.message)
+            else:
+                stats_command(call.message)
             bot.answer_callback_query(call.id, "📊 Statistiques")
         
         elif call.data == "admin_users":
-            users_command(call.message)
+            # Pour 7908680781, exécuter directement
+            if is_owner(user_id):
+                users_command(call.message)
+            else:
+                users_command(call.message)
             bot.answer_callback_query(call.id, "👥 Utilisateurs")
         
         elif call.data == "admin_premium":
@@ -877,15 +814,27 @@ def callback_handler(call):
             bot.answer_callback_query(call.id, "🎁 Donner Premium")
         
         elif call.data == "admin_broadcast":
-            broadcast_command(call.message)
+            # Pour 7908680781, exécuter directement
+            if is_owner(user_id):
+                broadcast_command(call.message)
+            else:
+                broadcast_command(call.message)
             bot.answer_callback_query(call.id, "📢 Broadcast")
         
         elif call.data == "admin_mail":
-            mail_command(call.message)
+            # Pour 7908680781, exécuter directement
+            if is_owner(user_id):
+                mail_command(call.message)
+            else:
+                mail_command(call.message)
             bot.answer_callback_query(call.id, "📨 Messages")
         
         elif call.data == "admin_premium_all":
-            premium_all_command(call.message)
+            # Pour 7908680781, exécuter directement
+            if is_owner(user_id):
+                premium_all_command(call.message)
+            else:
+                premium_all_command(call.message)
             bot.answer_callback_query(call.id, "⚡ Premium à Tous")
         
         elif call.data == "admin_cleanup":
@@ -963,7 +912,7 @@ def process_auth_callback(message, original_message):
 def process_give_premium(message):
     user_id = message.from_user.id
     
-    # 7908680781 a toujours accès
+    # 7908680781 a TOUJOURS accès
     if not is_owner(user_id) and not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 Authentification requise.")
         return
@@ -1035,7 +984,7 @@ def message_handler(message):
         
     user_id = message.from_user.id
     
-    # 7908680781 a toujours accès à l'IA
+    # 7908680781 a TOUJOURS accès à l'IA
     if not check_premium_access(user_id):
         total = get_group_stats()
         if total >= 5:
