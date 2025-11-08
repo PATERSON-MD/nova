@@ -54,11 +54,61 @@ def init_db():
                   premium_since TIMESTAMP,
                   added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
+    # Table des messages
+    c.execute('''CREATE TABLE IF NOT EXISTS user_messages
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  user_id INTEGER,
+                  username TEXT,
+                  first_name TEXT,
+                  message_text TEXT,
+                  message_date TIMESTAMP,
+                  replied BOOLEAN DEFAULT FALSE)''')
+    
     conn.commit()
     conn.close()
     print("✅ Base de données initialisée")
 
+def repair_database():
+    """Répare la structure de la base de données"""
+    try:
+        conn = sqlite3.connect('bot_groups.db')
+        c = conn.cursor()
+        
+        # Vérifier et ajouter les colonnes manquantes
+        columns_to_check = [
+            ('user_access', 'username', 'TEXT'),
+            ('user_access', 'first_name', 'TEXT'),
+            ('user_access', 'premium_since', 'TIMESTAMP')
+        ]
+        
+        for table, column, col_type in columns_to_check:
+            try:
+                c.execute(f'SELECT {column} FROM {table} LIMIT 1')
+            except sqlite3.OperationalError:
+                print(f"🔄 Ajout de la colonne {column}...")
+                c.execute(f'ALTER TABLE {table} ADD COLUMN {column} {col_type}')
+                conn.commit()
+                print(f"✅ Colonne {column} ajoutée")
+        
+        conn.close()
+        return True
+        
+    except Exception as e:
+        print(f"❌ Erreur réparation DB: {e}")
+        return False
+
+def check_group_requirements():
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    c.execute('SELECT COUNT(*) FROM groups')
+    total_groups = c.fetchone()[0]
+    conn.close()
+    return total_groups >= 5
+
 def check_premium_access(user_id):
+    """Vérifie l'accès premium - 7908680781 a toujours le premium"""
+    if user_id == ADMIN_ID:
+        return True
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     c.execute('SELECT has_premium FROM user_access WHERE user_id = ?', (user_id,))
@@ -75,6 +125,16 @@ def activate_user_premium(user_id):
     conn.commit()
     conn.close()
 
+def deactivate_user_premium(user_id):
+    """Désactive le premium - impossible pour 7908680781"""
+    if user_id == ADMIN_ID:
+        return  # On ne peut pas retirer le premium au propriétaire
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    c.execute('UPDATE user_access SET has_premium = FALSE, premium_since = NULL WHERE user_id = ?', (user_id,))
+    conn.commit()
+    conn.close()
+
 def get_all_users():
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
@@ -83,6 +143,22 @@ def get_all_users():
     conn.close()
     return users
 
+def get_premium_users():
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    c.execute('SELECT user_id, username, first_name, premium_since FROM user_access WHERE has_premium = TRUE')
+    users = c.fetchall()
+    conn.close()
+    return users
+
+def get_user_info(user_id):
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    c.execute('SELECT user_id, username, first_name, has_premium, premium_since, added_date FROM user_access WHERE user_id = ?', (user_id,))
+    result = c.fetchone()
+    conn.close()
+    return result
+
 def get_group_stats():
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
@@ -90,6 +166,16 @@ def get_group_stats():
     total = c.fetchone()[0]
     conn.close()
     return total
+
+def add_group_to_db(group_id, group_name, member_count):
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    c.execute('''INSERT OR IGNORE INTO groups 
+                 (group_id, group_name, member_count, added_date)
+                 VALUES (?, ?, ?, ?)''', 
+                 (group_id, group_name, member_count, datetime.now()))
+    conn.commit()
+    conn.close()
 
 def register_user(user_id, username, first_name):
     conn = sqlite3.connect('bot_groups.db')
@@ -101,13 +187,90 @@ def register_user(user_id, username, first_name):
     conn.commit()
     conn.close()
 
+def save_user_message(user_id, username, first_name, message_text):
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    c.execute('''INSERT INTO user_messages 
+                 (user_id, username, first_name, message_text, message_date)
+                 VALUES (?, ?, ?, ?, ?)''', 
+                 (user_id, username, first_name, message_text, datetime.now()))
+    conn.commit()
+    conn.close()
+
+def get_user_messages(user_id=None):
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    if user_id:
+        c.execute('''SELECT * FROM user_messages 
+                     WHERE user_id = ? ORDER BY message_date DESC LIMIT 50''', (user_id,))
+    else:
+        c.execute('''SELECT * FROM user_messages 
+                     ORDER BY message_date DESC LIMIT 100''')
+    messages = c.fetchall()
+    conn.close()
+    return messages
+
+def get_recent_messages(limit=20):
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    c.execute('''SELECT * FROM user_messages 
+                 ORDER BY message_date DESC LIMIT ?''', (limit,))
+    messages = c.fetchall()
+    conn.close()
+    return messages
+
+def delete_user_data(user_id):
+    """Supprime toutes les données d'un utilisateur - impossible pour 7908680781"""
+    if user_id == ADMIN_ID:
+        return False  # On ne peut pas supprimer le propriétaire
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    c.execute('DELETE FROM user_access WHERE user_id = ?', (user_id,))
+    c.execute('DELETE FROM user_messages WHERE user_id = ?', (user_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+def get_user_stats():
+    """Récupère des statistiques détaillées sur les utilisateurs"""
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    
+    # Nombre total d'utilisateurs
+    c.execute('SELECT COUNT(*) FROM user_access')
+    total_users = c.fetchone()[0]
+    
+    # Utilisateurs avec username
+    c.execute('SELECT COUNT(*) FROM user_access WHERE username IS NOT NULL AND username != ""')
+    users_with_username = c.fetchone()[0]
+    
+    # Utilisateurs sans username
+    c.execute('SELECT COUNT(*) FROM user_access WHERE username IS NULL OR username = ""')
+    users_without_username = c.fetchone()[0]
+    
+    # Nouveaux utilisateurs aujourd'hui
+    today = datetime.now().strftime('%Y-%m-%d')
+    c.execute('SELECT COUNT(*) FROM user_access WHERE DATE(added_date) = ?', (today,))
+    new_today = c.fetchone()[0]
+    
+    conn.close()
+    
+    return {
+        'total_users': total_users,
+        'with_username': users_with_username,
+        'without_username': users_without_username,
+        'new_today': new_today
+    }
+
 # ==================== FONCTIONS ADMIN ====================
 def is_owner(user_id):
     """Vérifie si l'utilisateur est le propriétaire 7908680781"""
     return user_id == ADMIN_ID
 
 def is_admin_authenticated(user_id):
-    """Vérifie si l'admin est authentifié"""
+    """Vérifie si l'admin est authentifié - 7908680781 est toujours authentifié"""
+    if user_id == ADMIN_ID:
+        return True
     if user_id not in admin_sessions:
         return False
     return admin_sessions[user_id]['authenticated']
@@ -116,6 +279,14 @@ def verify_admin_password(password):
     return password == ADMIN_PASSWORD
 
 # ==================== FONCTIONS UTILISATEURS ====================
+def get_user_session(user_id):
+    if user_id not in user_sessions:
+        user_sessions[user_id] = {
+            'conversation': [],
+            'last_active': datetime.now()
+        }
+    return user_sessions[user_id]
+
 def get_progress_bar():
     total = get_group_stats()
     filled = '█' * min(total, 5)
@@ -125,11 +296,12 @@ def get_progress_bar():
 def create_main_menu():
     keyboard = InlineKeyboardMarkup()
     support_button = InlineKeyboardButton("💝 Support Créateur", url="https://t.me/Soszoe")
+    comment_button = InlineKeyboardButton("📝 Commentaire", callback_data="send_comment")
     keyboard.add(support_button)
+    keyboard.add(comment_button)
     return keyboard
 
-def create_premium_menu(user_id=None):
-    """Menu premium avec bouton Auth SAUF pour le propriétaire"""
+def create_premium_menu():
     keyboard = InlineKeyboardMarkup()
     
     try:
@@ -144,20 +316,19 @@ def create_premium_menu(user_id=None):
     
     status_button = InlineKeyboardButton("📊 Vérifier le statut", callback_data="check_status")
     premium_button = InlineKeyboardButton("🎁 Activer Premium", callback_data="activate_premium")
+    comment_button = InlineKeyboardButton("📝 Commentaire", callback_data="send_comment")
+    auth_button = InlineKeyboardButton("🔐 Auth Admin", callback_data="admin_auth")
     
     keyboard.add(add_button)
     keyboard.add(status_button)
     keyboard.add(premium_button)
-    
-    # Ajouter bouton Auth UNIQUEMENT si ce n'est pas le propriétaire
-    if not is_owner(user_id):
-        auth_button = InlineKeyboardButton("🔐 Auth Admin", callback_data="admin_auth")
-        keyboard.add(auth_button)
+    keyboard.add(comment_button)
+    keyboard.add(auth_button)
     
     return keyboard
 
 def create_owner_menu():
-    """Menu du propriétaire 7908680781 - TOUT DÉBLOQUÉ"""
+    """Menu du propriétaire 7908680781"""
     keyboard = InlineKeyboardMarkup()
     
     # 📊 STATISTIQUES
@@ -199,10 +370,12 @@ def create_premium_management_menu():
     remove_btn = InlineKeyboardButton("🔒 Retirer Premium", callback_data="admin_remove_premium")
     all_btn = InlineKeyboardButton("⚡ Premium à Tous", callback_data="admin_premium_all")
     remove_all_btn = InlineKeyboardButton("🗑️ Retirer à Tous", callback_data="admin_remove_all_premium")
+    list_btn = InlineKeyboardButton("📋 Liste Premium", callback_data="admin_list_premium")
     back_btn = InlineKeyboardButton("🔙 Retour", callback_data="admin_back")
     
     keyboard.add(give_btn, remove_btn)
     keyboard.add(all_btn, remove_all_btn)
+    keyboard.add(list_btn)
     keyboard.add(back_btn)
     
     return keyboard
@@ -226,6 +399,9 @@ def create_advanced_admin_menu():
     
     return keyboard
 
+def create_optimized_prompt():
+    return f"""Tu es {BOT_NAME}, assistant IA créé par {CREATOR}. Expert en programmation, création, analyse et aide générale. Sois naturel, précis et utile. Réponds dans la langue de l'utilisateur."""
+
 # ==================== ENVOI DE PHOTO ====================
 def send_legendary_photo(chat_id, caption, reply_markup=None):
     """Envoie une photo avec le style légendaire"""
@@ -240,6 +416,7 @@ def send_legendary_photo(chat_id, caption, reply_markup=None):
         return True
     except Exception as e:
         print(f"❌ Erreur envoi photo: {e}")
+        # Fallback: envoyer le message sans photo
         bot.send_message(
             chat_id,
             caption,
@@ -301,7 +478,7 @@ def start_handler(message):
         send_legendary_photo(
             message.chat.id,
             f"📸 **{CREATOR}** - Créateur du bot\n*Votre expert en IA* 👑",
-            create_main_menu() if check_premium_access(user_id) else create_premium_menu(user_id)
+            create_main_menu() if check_premium_access(user_id) else create_premium_menu()
         )
         
         time.sleep(0.5)
@@ -361,7 +538,7 @@ pour débloquer toutes les fonctionnalités !
 3. Le premium se débloque à 5 groupes
 """
             
-            bot.send_message(message.chat.id, menu, parse_mode='Markdown', reply_markup=create_premium_menu(user_id))
+            bot.send_message(message.chat.id, menu, parse_mode='Markdown', reply_markup=create_premium_menu())
             
     except Exception as e:
         print(f"❌ Erreur start: {e}")
@@ -423,13 +600,28 @@ def process_auth(message):
         print(f"❌ Auth échouée pour {username}")
         bot.reply_to(message, "❌ **Mot de passe incorrect.**\n\nUtilisez `/auth` pour réessayer.")
 
+@bot.message_handler(commands=['logout'])
+def logout_command(message):
+    """Déconnexion admin (sauf pour 7908680781)"""
+    user_id = message.from_user.id
+    
+    # 7908680781 ne peut pas se déconnecter
+    if is_owner(user_id):
+        bot.reply_to(message, "👑 **Vous êtes le propriétaire permanent !**\n\nImpossible de vous déconnecter.")
+        return
+    
+    if user_id in admin_sessions:
+        del admin_sessions[user_id]
+    
+    bot.reply_to(message, "🔓 **Déconnexion réussie !**\n\nSession admin terminée.")
+
 # ==================== COMMANDES ADMIN ====================
 @bot.message_handler(commands=['stats'])
 def stats_command(message):
     """Statistiques du bot"""
     user_id = message.from_user.id
     
-    # Vérifier les droits admin
+    # Vérifier les droits admin - 7908680781 a toujours accès
     if not is_owner(user_id) and not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nUtilisez `/auth` pour vous authentifier.")
         return
@@ -437,6 +629,7 @@ def stats_command(message):
     total_users = len(get_all_users())
     premium_users = len(get_premium_users())
     groups_count = get_group_stats()
+    total_messages = len(get_user_messages())
     
     stats_text = f"""
 📊 **STATISTIQUES LÉGENDAIRES**
@@ -445,6 +638,7 @@ def stats_command(message):
 ⭐ **Premium :** {premium_users}
 🔒 **Standard :** {total_users - premium_users}
 📁 **Groupes :** {groups_count}/5
+📨 **Messages :** {total_messages}
 🕐 **MAJ :** {datetime.now().strftime('%H:%M %d/%m/%Y')}
 
 👑 **Propriétaire :** 7908680781
@@ -456,6 +650,7 @@ def users_command(message):
     """Lister les utilisateurs"""
     user_id = message.from_user.id
     
+    # 7908680781 a toujours accès
     if not is_owner(user_id) and not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nUtilisez `/auth` pour vous authentifier.")
         return
@@ -485,6 +680,7 @@ def premium_all_command(message):
     """Donner le premium à tous"""
     user_id = message.from_user.id
     
+    # 7908680781 a toujours accès
     if not is_owner(user_id) and not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nUtilisez `/auth` pour vous authentifier.")
         return
@@ -501,6 +697,7 @@ def broadcast_command(message):
     """Envoyer un message à tous"""
     user_id = message.from_user.id
     
+    # 7908680781 a toujours accès
     if not is_owner(user_id) and not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nUtilisez `/auth` pour vous authentifier.")
         return
@@ -511,6 +708,7 @@ def broadcast_command(message):
 def process_broadcast(message):
     user_id = message.from_user.id
     
+    # 7908680781 a toujours accès
     if not is_owner(user_id) and not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 Authentification requise.")
         return
@@ -553,6 +751,54 @@ def process_broadcast(message):
 """
     send_legendary_photo(message.chat.id, result_text)
 
+@bot.message_handler(commands=['mail'])
+def mail_command(message):
+    """Voir les messages reçus"""
+    user_id = message.from_user.id
+    
+    # 7908680781 a toujours accès
+    if not is_owner(user_id) and not is_admin_authenticated(user_id):
+        bot.reply_to(message, "🔐 **Accès refusé.**\n\nUtilisez `/auth` pour vous authentifier.")
+        return
+    
+    show_mail_history(message)
+
+def show_mail_history(message, page=1):
+    messages = get_recent_messages(limit=50)
+    
+    if not messages:
+        send_legendary_photo(message.chat.id, "📭 **AUCUN MESSAGE REÇU**\n\nAucun utilisateur n'a encore envoyé de message.")
+        return
+    
+    items_per_page = 10
+    start_idx = (page - 1) * items_per_page
+    end_idx = start_idx + items_per_page
+    page_messages = messages[start_idx:end_idx]
+    
+    response = f"📨 **MESSAGES REÇUS**\n\n"
+    response += f"📊 Total messages: {len(messages)}\n"
+    response += f"📄 Page {page}/{(len(messages) + items_per_page - 1) // items_per_page}\n\n"
+    
+    for i, msg in enumerate(page_messages, start_idx + 1):
+        msg_id, user_id, username, first_name, message_text, message_date, replied = msg
+        username_display = f"@{username}" if username else "❌ Sans username"
+        date_str = message_date.split('.')[0] if isinstance(message_date, str) else message_date.strftime("%d/%m/%Y %H:%M")
+        
+        response += f"**{i}. {first_name}** ({username_display})\n"
+        response += f"🆔 `{user_id}` | 📅 {date_str}\n"
+        response += f"💬 {message_text[:100]}{'...' if len(message_text) > 100 else ''}\n"
+        response += "━━━━━━━━━━━━━━━━━━━━\n\n"
+    
+    keyboard = InlineKeyboardMarkup()
+    if page > 1:
+        keyboard.add(InlineKeyboardButton("⬅️ Page précédente", callback_data=f"mail_page_{page-1}"))
+    if end_idx < len(messages):
+        keyboard.add(InlineKeyboardButton("Page suivante ➡️", callback_data=f"mail_page_{page+1}"))
+    
+    keyboard.add(InlineKeyboardButton("🔄 Actualiser", callback_data="admin_mail"))
+    
+    bot.send_message(message.chat.id, response, parse_mode='Markdown', reply_markup=keyboard)
+
 # ==================== GESTION DES CALLBACKS ====================
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
@@ -584,6 +830,11 @@ def callback_handler(call):
                 bot.send_message(call.message.chat.id, "🎉 **Premium activé avec succès !**\n\n✨ Profitez de l'IA !")
         else:
             bot.answer_callback_query(call.id, f"❌ {5-total} groupe(s) manquant(s)")
+    
+    elif call.data == "send_comment":
+        msg = bot.send_message(call.message.chat.id, "📝 **ENVOYER UN COMMENTAIRE**\n\nÉcrivez votre message pour le créateur :")
+        bot.register_next_step_handler(msg, process_comment)
+        bot.answer_callback_query(call.id, "📝 Commentaire")
     
     elif call.data == "admin_auth":
         # Bouton Auth pour les utilisateurs normaux
@@ -630,36 +881,31 @@ def callback_handler(call):
             bot.answer_callback_query(call.id, "📢 Broadcast")
         
         elif call.data == "admin_mail":
-            # Simuler la commande mail
-            users = get_all_users()
-            response = f"📨 **MESSAGES REÇUS**\n\n📊 Total utilisateurs: {len(users)}\n💡 Fonctionnalité à venir..."
-            send_legendary_photo(call.message.chat.id, response)
+            mail_command(call.message)
             bot.answer_callback_query(call.id, "📨 Messages")
-        
-        elif call.data == "admin_logs":
-            response = "📋 **LOGS ADMIN**\n\n🕐 Dernière activité: Maintenant\n👤 Admin connecté: Vous\n💡 Système opérationnel"
-            send_legendary_photo(call.message.chat.id, response)
-            bot.answer_callback_query(call.id, "📋 Logs")
-        
-        elif call.data == "admin_system":
-            response = "🖥️ **SYSTÈME**\n\n💾 Mémoire: OK\n⚡ CPU: Optimal\n🔗 Connexion: Stable\n🤖 Bot: Actif"
-            send_legendary_photo(call.message.chat.id, response)
-            bot.answer_callback_query(call.id, "🖥️ Système")
-        
-        elif call.data == "admin_advanced":
-            send_legendary_photo(
-                call.message.chat.id,
-                "⚡ **OUTILS AVANCÉS**\n\nChoisissez un outil :",
-                create_advanced_admin_menu()
-            )
-            bot.answer_callback_query(call.id, "⚡ Avancé")
         
         elif call.data == "admin_premium_all":
             premium_all_command(call.message)
             bot.answer_callback_query(call.id, "⚡ Premium à Tous")
         
         elif call.data == "admin_cleanup":
-            response = "🧹 **NETTOYAGE EFFECTUÉ**\n\n✅ Base de données optimisée\n🗑️ Cache nettoyé\n⚡ Performances améliorées"
+            conn = sqlite3.connect('bot_groups.db')
+            c = conn.cursor()
+            c.execute('SELECT COUNT(*) FROM user_messages')
+            before_messages = c.fetchone()[0]
+            c.execute('DELETE FROM user_messages WHERE message_date < datetime("now", "-30 days")')
+            deleted_messages = c.changes
+            conn.commit()
+            conn.close()
+            
+            response = f"""
+🧹 **NETTOYAGE EFFECTUÉ**
+
+📨 **Messages :**
+• Avant : {before_messages}
+• Supprimés : {deleted_messages}
+• Restants : {before_messages - deleted_messages}
+"""
             send_legendary_photo(call.message.chat.id, response)
             bot.answer_callback_query(call.id, "🧹 Nettoyage")
         
@@ -717,6 +963,7 @@ def process_auth_callback(message, original_message):
 def process_give_premium(message):
     user_id = message.from_user.id
     
+    # 7908680781 a toujours accès
     if not is_owner(user_id) and not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 Authentification requise.")
         return
@@ -737,6 +984,48 @@ def process_give_premium(message):
     except ValueError:
         bot.reply_to(message, "❌ ID utilisateur invalide.")
 
+def process_comment(message):
+    """Traite l'envoi d'un commentaire"""
+    user_id = message.from_user.id
+    username = message.from_user.username or "Sans username"
+    first_name = message.from_user.first_name or "Utilisateur"
+    comment_text = message.text
+    
+    save_user_message(user_id, username, first_name, comment_text)
+    
+    bot.reply_to(message, "✅ **Commentaire envoyé !**\n\nLe propriétaire a été notifié !")
+
+# ==================== GESTION GROUPES ====================
+@bot.message_handler(content_types=['new_chat_members'])
+def new_member_handler(message):
+    """Quand le bot est ajouté à un groupe"""
+    try:
+        if bot.get_me().id in [user.id for user in message.new_chat_members]:
+            group_id = message.chat.id
+            group_name = message.chat.title or "Groupe sans nom"
+            
+            try:
+                member_count = bot.get_chat_members_count(group_id)
+            except:
+                member_count = 0
+            
+            add_group_to_db(group_id, group_name, member_count)
+            
+            welcome_msg = f"""
+🤖 **{BOT_NAME}** - Merci de m'avoir ajouté !
+
+👑 Créé par {CREATOR}
+🚀 Assistant IA LÉGENDAIRE
+
+📊 **Ce groupe compte pour le déblocage du premium gratuit !**
+
+💡 Utilisez /start en privé pour voir votre progression.
+"""
+            bot.send_message(group_id, welcome_msg, parse_mode='Markdown')
+            
+    except Exception as e:
+        print(f"❌ Erreur nouveau groupe: {e}")
+
 # ==================== MOTEUR IA ====================
 @bot.message_handler(func=lambda message: True)
 def message_handler(message):
@@ -746,16 +1035,17 @@ def message_handler(message):
         
     user_id = message.from_user.id
     
+    # 7908680781 a toujours accès à l'IA
     if not check_premium_access(user_id):
         total = get_group_stats()
         if total >= 5:
             bot.reply_to(message, 
                        "🎊 **PRÊT POUR LE PREMIUM !**\n\n✅ 5/5 groupes atteints !\n\n🎁 Cliquez sur 'Activer Premium' pour débloquer l'IA !",
-                       reply_markup=create_premium_menu(user_id))
+                       reply_markup=create_premium_menu())
         else:
             bot.reply_to(message, 
                        f"🔒 **Version limitée**\n\n{get_progress_bar()}\n\nAjoutez le bot à {5-total} groupe(s) pour débloquer l'IA.",
-                       reply_markup=create_premium_menu(user_id))
+                       reply_markup=create_premium_menu())
         return
     
     # ✅ UTILISATEUR PREMIUM - Traitement IA
@@ -770,9 +1060,9 @@ def message_handler(message):
         
         headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
         
-        messages = [{"role": "system", "content": f"Tu es {BOT_NAME}, assistant IA créé par {CREATOR}. Sois utile et naturel."}]
+        messages = [{"role": "system", "content": create_optimized_prompt()}]
         if user_session['conversation']:
-            messages.extend(user_session['conversation'][-2:])
+            messages.extend(user_session['conversation'][-4:])
         
         user_message = message.text[:500]
         messages.append({"role": "user", "content": user_message})
@@ -780,39 +1070,56 @@ def message_handler(message):
         payload = {
             "messages": messages,
             "model": current_model,
-            "max_tokens": 800,
-            "temperature": 0.7
+            "max_tokens": 1024,
+            "temperature": 0.7,
+            "top_p": 0.9
         }
 
-        response = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=15)
+        response = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=20)
         
         if response.status_code == 200:
             answer = response.json()["choices"][0]["message"]["content"]
             
-            user_session['conversation'].append({"role": "user", "content": user_message[:200]})
-            user_session['conversation'].append({"role": "assistant", "content": answer[:500]})
-            user_sessions[user_id] = user_session
+            user_session['conversation'].extend([
+                {"role": "user", "content": user_message[:300]},
+                {"role": "assistant", "content": answer[:600]}
+            ])
+            
+            if len(user_session['conversation']) > 8:
+                user_session['conversation'] = user_session['conversation'][-8:]
+            
+            user_session['last_active'] = datetime.now()
             
             bot.reply_to(message, answer)
         else:
-            bot.reply_to(message, "❌ Erreur de service. Réessayez.")
+            error_msg = "❌ Erreur de service. Réessayez dans quelques instants."
+            if response.status_code == 429:
+                error_msg = "⏰ Trop de requêtes. Veuillez patienter quelques secondes."
+            elif response.status_code == 401:
+                error_msg = "🔑 Erreur d'authentification API."
             
+            bot.reply_to(message, error_msg)
+            
+    except requests.exceptions.Timeout:
+        bot.reply_to(message, "⏰ Délai d'attente dépassé. Réessayez.")
     except Exception as e:
         print(f"❌ Erreur IA: {e}")
-        bot.reply_to(message, "🔧 Service indisponible. Réessayez.")
+        bot.reply_to(message, "🔧 Service temporairement indisponible. Réessayez plus tard.")
 
 # ==================== DÉMARRAGE ====================
 if __name__ == "__main__":
-    print("🗃️ Initialisation...")
+    print("🗃️ Initialisation de la base de données...")
     init_db()
-    print("✅ Base prête")
+    repair_database()
+    print("✅ Base de données prête")
     print(f"🚀 {BOT_NAME} - {VERSION}")
     print(f"👑 Créateur: {CREATOR}")
-    print("💎 SYSTÈME PROPRIÉTAIRE PERMANENT")
+    print("💎 SYSTÈME ADMIN PERMANENT ACTIVÉ")
     print(f"   👑 Propriétaire: {ADMIN_ID}")
     print("   🔑 Mot de passe admin: KING1998")
-    print("   🔐 Bouton Auth UNIQUEMENT pour les autres")
+    print("   🔐 Bouton Auth disponible pour les autres")
     print("   ⭐ 7908680781 a tout débloqué automatiquement")
+    print("   📊 Panel complet avec tous les boutons")
     print("🤖 En attente de messages...")
     
     try:
