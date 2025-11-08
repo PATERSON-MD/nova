@@ -249,38 +249,6 @@ def is_admin_authenticated(user_id):
         return False
     return session['authenticated']
 
-def require_admin_auth(func):
-    """Décorateur pour exiger l'authentification admin"""
-    def wrapper(message):
-        user_id = message.from_user.id
-        if not is_admin(user_id):
-            bot.reply_to(message, "❌ Accès réservé au propriétaire.")
-            return
-        
-        if not is_admin_authenticated(user_id):
-            msg = bot.reply_to(message, "🔐 **Authentification requise**\n\nVeuillez entrer le mot de passe admin :")
-            bot.register_next_step_handler(msg, process_admin_auth_for_command, func, message)
-            return
-        
-        # Si authentifié, exécuter la commande
-        func(message)
-    
-    return wrapper
-
-def process_admin_auth_for_command(message, original_func, original_message):
-    """Traite l'authentification pour une commande spécifique"""
-    user_id = message.from_user.id
-    if not is_admin(user_id):
-        return
-    
-    if verify_admin_password(message.text.strip()):
-        admin_sessions[user_id] = {'authenticated': True, 'auth_time': datetime.now()}
-        bot.send_message(message.chat.id, "✅ **Authentification réussie !**")
-        # Exécuter la commande originale après authentification
-        original_func(original_message)
-    else:
-        bot.reply_to(message, "❌ **Mot de passe incorrect.**\n\nUtilisez à nouveau la commande admin.")
-
 # ==================== FONCTIONS UTILISATEURS ====================
 def get_user_session(user_id):
     """Gère les sessions utilisateur"""
@@ -332,29 +300,28 @@ def create_premium_menu():
     
     return keyboard
 
-def create_admin_menu():
-    """Menu administrateur principal"""
+def create_admin_menu(user_id=None):
+    """Menu administrateur - Affiche Auth si pas authentifié"""
     keyboard = InlineKeyboardMarkup()
     
-    # Ligne 1
-    stats_btn = InlineKeyboardButton("📊 Statistiques", callback_data="admin_stats")
-    users_btn = InlineKeyboardButton("👥 Utilisateurs", callback_data="admin_users")
-    
-    # Ligne 2
-    premium_btn = InlineKeyboardButton("⭐ Gérer Premium", callback_data="admin_premium")
-    broadcast_btn = InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")
-    
-    # Ligne 3
-    mail_btn = InlineKeyboardButton("📨 Mail Historique", callback_data="admin_mail")
-    commands_btn = InlineKeyboardButton("🛠️ Commandes", callback_data="admin_commands")
-    
-    # Ligne 4
-    help_btn = InlineKeyboardButton("❓ Aide Admin", callback_data="admin_help")
-    
-    keyboard.add(stats_btn, users_btn)
-    keyboard.add(premium_btn, broadcast_btn)
-    keyboard.add(mail_btn, commands_btn)
-    keyboard.add(help_btn)
+    if user_id and is_admin_authenticated(user_id):
+        # ✅ ADMIN AUTHENTIFIÉ - Menu complet débloqué
+        stats_btn = InlineKeyboardButton("📊 Statistiques", callback_data="admin_stats")
+        users_btn = InlineKeyboardButton("👥 Utilisateurs", callback_data="admin_users")
+        premium_btn = InlineKeyboardButton("⭐ Gérer Premium", callback_data="admin_premium")
+        broadcast_btn = InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")
+        mail_btn = InlineKeyboardButton("📨 Mail Historique", callback_data="admin_mail")
+        commands_btn = InlineKeyboardButton("🛠️ Commandes", callback_data="admin_commands")
+        help_btn = InlineKeyboardButton("❓ Aide Admin", callback_data="admin_help")
+        
+        keyboard.add(stats_btn, users_btn)
+        keyboard.add(premium_btn, broadcast_btn)
+        keyboard.add(mail_btn, commands_btn)
+        keyboard.add(help_btn)
+    else:
+        # 🔐 ADMIN NON AUTHENTIFIÉ - Bouton Auth seulement
+        auth_btn = InlineKeyboardButton("🔐 Authentification Admin", callback_data="admin_auth")
+        keyboard.add(auth_btn)
     
     return keyboard
 
@@ -376,10 +343,17 @@ def start_handler(message):
         # ✅ PROPRIÉTAIRE - Premium immédiat
         if is_admin(user_id):
             activate_user_premium(user_id)
+            
+            # Vérifier si admin est déjà authentifié
+            if is_admin_authenticated(user_id):
+                menu_text = "👑 **Mode Propriétaire Activé**\n\n⭐ **Premium activé pour vous !**\n🔓 **Session admin active** - Accès complet débloqué !"
+            else:
+                menu_text = "👑 **Mode Propriétaire Activé**\n\n⭐ **Premium activé pour vous !**\n🔐 **Authentification requise** - Cliquez sur 'Auth' pour débloquer le panel admin."
+            
             bot.send_message(
                 message.chat.id,
-                "👑 **Mode Propriétaire Activé**\n\n⭐ **Premium activé pour vous !**\n📢 Accès au panel administrateur.",
-                reply_markup=create_admin_menu(),
+                menu_text,
+                reply_markup=create_admin_menu(user_id),
                 parse_mode='Markdown'
             )
             return
@@ -629,21 +603,44 @@ def admin_command(message):
         bot.reply_to(message, "❌ Accès réservé au propriétaire.")
         return
     
-    msg = bot.reply_to(message, "🔐 **Accès Administrateur**\n\nVeuillez entrer le mot de passe :")
-    bot.register_next_step_handler(msg, process_admin_password)
+    bot.send_message(
+        message.chat.id,
+        "👑 **Panel Administrateur**\n\nSélectionnez une option :",
+        reply_markup=create_admin_menu(user_id),
+        parse_mode='Markdown'
+    )
 
-def process_admin_password(message):
-    """Traite le mot de passe admin"""
+def require_admin_auth(func):
+    """Décorateur pour exiger l'authentification admin"""
+    def wrapper(message):
+        user_id = message.from_user.id
+        if not is_admin(user_id):
+            bot.reply_to(message, "❌ Accès réservé au propriétaire.")
+            return
+        
+        if not is_admin_authenticated(user_id):
+            msg = bot.reply_to(message, "🔐 **Authentification requise**\n\nVeuillez entrer le mot de passe admin :")
+            bot.register_next_step_handler(msg, process_admin_auth_for_command, func, message)
+            return
+        
+        # Si authentifié, exécuter la commande
+        func(message)
+    
+    return wrapper
+
+def process_admin_auth_for_command(message, original_func, original_message):
+    """Traite l'authentification pour une commande spécifique"""
     user_id = message.from_user.id
     if not is_admin(user_id):
         return
     
     if verify_admin_password(message.text.strip()):
         admin_sessions[user_id] = {'authenticated': True, 'auth_time': datetime.now()}
-        bot.send_message(message.chat.id, "✅ **Authentification réussie !**\n\nBienvenue dans le panel administrateur.", 
-                        reply_markup=create_admin_menu())
+        bot.send_message(message.chat.id, "✅ **Authentification réussie !**")
+        # Exécuter la commande originale après authentification
+        original_func(original_message)
     else:
-        bot.reply_to(message, "❌ **Mot de passe incorrect.**")
+        bot.reply_to(message, "❌ **Mot de passe incorrect.**\n\nUtilisez à nouveau la commande admin.")
 
 @bot.message_handler(commands=['mail'])
 @require_admin_auth
@@ -949,7 +946,7 @@ def admin_commands_command(message):
 `/admin` - Panel d'authentification
 `/commands` - Ce menu des commandes
 
-💡 **ASTUCE :** Utilisez `/admin` pour le panel interactif !
+💡 **ASTUCE :** Utilisez le panel `/admin` pour une navigation facile !
 """
     
     bot.reply_to(message, commands_text, parse_mode='Markdown')
@@ -990,6 +987,15 @@ def callback_handler(call):
         msg = bot.send_message(call.message.chat.id, "📝 **ENVOYER UN COMMENTAIRE**\n\nÉcrivez votre message pour le créateur :")
         bot.register_next_step_handler(msg, process_comment)
         bot.answer_callback_query(call.id, "📝 Commentaire")
+    
+    elif call.data == "admin_auth":
+        if not is_admin(user_id):
+            bot.answer_callback_query(call.id, "❌ Accès réservé")
+            return
+        
+        msg = bot.send_message(call.message.chat.id, "🔐 **AUTHENTIFICATION ADMIN**\n\nVeuillez entrer le mot de passe :")
+        bot.register_next_step_handler(msg, process_admin_auth_callback, call.message)
+        bot.answer_callback_query(call.id, "🔐 Authentification")
     
     elif call.data == "admin_stats":
         if not is_admin(user_id) or not is_admin_authenticated(user_id):
@@ -1085,27 +1091,25 @@ def callback_handler(call):
 💡 **Conseils d'utilisation :**
 
 🔐 **Authentification :**
-- Utilisez `/admin` pour vous authentifier
+- Cliquez sur "Auth" pour vous authentifier
 - Session valide 30 minutes
-- Mot de passe requis pour toutes les commandes
+- Une fois authentifié, tous les boutons sont débloqués
 
 📊 **Pour les statistiques :**
-- Utilisez `/stats` pour un aperçu général
-- `/users` pour voir tous les utilisateurs
-- `/premium_users` pour les utilisateurs premium
+- Utilisez "Statistiques" pour un aperçu général
+- "Utilisateurs" pour voir tous les utilisateurs
 
 ⭐ **Gestion du premium :**
-- `/give_premium ID` - Donne le premium
-- `/premium_all` - Premium massif
-- Les utilisateurs premium ont accès à l'IA
+- "Gérer Premium" pour le menu complet
+- Donner/retirer premium individuellement ou en masse
 
 📨 **Système de messages :**
 - Les utilisateurs utilisent `/commentaire`
-- Vous consultez avec `/mail`
+- Vous consultez avec "Mail Historique"
 - Notifications en temps réel
 
 📢 **Communication :**
-- `/broadcast` pour messages massifs
+- "Broadcast" pour messages massifs
 - Utilisez avec modération
 
 🆘 **Support :** Contactez @Soszoe pour assistance
@@ -1167,6 +1171,34 @@ def callback_handler(call):
         bot.answer_callback_query(call.id, "🔒 Premium retiré")
         bot.send_message(call.message.chat.id, f"🔒 **Premium retiré à {count} utilisateurs !**")
 
+def process_admin_auth_callback(message, original_message):
+    """Traite l'authentification depuis le callback"""
+    user_id = message.from_user.id
+    if not is_admin(user_id):
+        return
+    
+    if verify_admin_password(message.text.strip()):
+        admin_sessions[user_id] = {'authenticated': True, 'auth_time': datetime.now()}
+        
+        # Mettre à jour le message original avec le menu débloqué
+        try:
+            bot.edit_message_text(
+                chat_id=original_message.chat.id,
+                message_id=original_message.message_id,
+                text="👑 **Panel Administrateur**\n\n✅ **Authentification réussie !**\n🔓 **Tous les boutons sont maintenant débloqués !**",
+                parse_mode='Markdown',
+                reply_markup=create_admin_menu(user_id)
+            )
+        except:
+            bot.send_message(
+                original_message.chat.id,
+                "✅ **Authentification réussie !**\n🔓 **Tous les boutons sont maintenant débloqués !**",
+                reply_markup=create_admin_menu(user_id),
+                parse_mode='Markdown'
+            )
+    else:
+        bot.reply_to(message, "❌ **Mot de passe incorrect.**\n\nUtilisez à nouveau le bouton Auth.")
+
 # ==================== DÉMARRAGE ====================
 if __name__ == "__main__":
     print("🗃️ Initialisation de la base de données...")
@@ -1175,8 +1207,8 @@ if __name__ == "__main__":
     print("✅ Base de données prête")
     print(f"🚀 {BOT_NAME} - {VERSION}")
     print(f"👑 Créateur: {CREATOR}")
-    print("🔐 Système d'authentification admin activé")
-    print("📊 Commandes admin sécurisées")
+    print("🔐 Système d'authentification avec bouton Auth activé")
+    print("📊 Menu admin dynamique (boutons débloqués après auth)")
     print("📨 Système de commentaires activé")
     print("🤖 En attente de messages...")
     
