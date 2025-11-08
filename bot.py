@@ -130,6 +130,20 @@ def create_premium_menu():
     status_button = InlineKeyboardButton("📊 Vérifier le statut", callback_data="check_status")
     keyboard.add(add_button)
     keyboard.add(status_button)
+    
+    # ✅ NOUVEAU BOUTON PREMIUM
+    premium_button = InlineKeyboardButton("🎁 Activer Premium", callback_data="activate_premium")
+    keyboard.add(premium_button)
+    
+    return keyboard
+
+def create_premium_unlocked_menu():
+    """Menu quand le premium est débloqué"""
+    keyboard = InlineKeyboardMarkup()
+    premium_btn = InlineKeyboardButton("⭐ Premium Activé", callback_data="premium_active")
+    support_btn = InlineKeyboardButton("💝 Support Créateur", url="https://t.me/Soszoe")
+    keyboard.add(premium_btn)
+    keyboard.add(support_btn)
     return keyboard
 
 def create_optimized_prompt():
@@ -159,6 +173,7 @@ def start_handler(message):
         print(f"Photo non chargée: {e}")
     
     if check_premium_access(user_id):
+        # ✅ PREMIUM DÉBLOQUÉ
         menu = f"""
 🎉 **{BOT_NAME}** - {VERSION} **PREMIUM**
 
@@ -173,11 +188,38 @@ def start_handler(message):
 • 💬 Conversation naturelle
 
 ✨ **Envoyez-moi un message pour commencer !**
+
+🎊 **Félicitations ! La communauté a débloqué le premium !**
 """
-        bot.send_message(message.chat.id, menu, parse_mode='Markdown', reply_markup=create_main_menu())
+        bot.send_message(
+            message.chat.id, 
+            menu, 
+            parse_mode='Markdown', 
+            reply_markup=create_premium_unlocked_menu()
+        )
     else:
         total = get_group_stats()
-        menu = f"""
+        
+        if total >= 5:
+            # ✅ CONDITIONS REMPLIES MAIS PAS ENCORE ACTIVÉ
+            menu = f"""
+🎊 **{BOT_NAME}** - PRÊT POUR LE PREMIUM !
+
+👑 **Créé par {CREATOR}**
+
+{get_progress_bar()}
+
+✅ **Conditions remplies !** 
+5/5 groupes atteints !
+
+🎁 **Cliquez sur "Activer Premium" ci-dessous**
+pour débloquer toutes les fonctionnalités !
+
+🚀 **L'IA vous attend !**
+"""
+        else:
+            # 🔒 VERSION LIMITÉE
+            menu = f"""
 🔒 **{BOT_NAME}** - {VERSION} **LIMITÉE**
 
 👑 **Créé par {CREATOR}**
@@ -201,16 +243,36 @@ def start_handler(message):
 
 👑 **La communauté grandit ensemble !**
 """
-        bot.send_message(message.chat.id, menu, parse_mode='Markdown', reply_markup=create_premium_menu())
+        
+        bot.send_message(
+            message.chat.id, 
+            menu, 
+            parse_mode='Markdown',
+            reply_markup=create_premium_menu()
+        )
 
 @bot.message_handler(commands=['status', 'premium'])
 def status_command(message):
     user_id = message.from_user.id
+    total = get_group_stats()
+    
     if check_premium_access(user_id):
         bot.reply_to(message, "✅ **Vous avez la version PREMIUM !** Profitez-en ! 🚀")
     else:
-        total = get_group_stats()
-        status_msg = f"""
+        if total >= 5:
+            status_msg = f"""
+🎊 **PRÊT POUR LE PREMIUM !**
+
+{get_progress_bar()}
+
+✅ **5/5 groupes atteints !**
+
+🎁 **Cliquez sur 'Activer Premium' pour débloquer !**
+
+🚀 **Toutes les fonctionnalités IA vous attendent !**
+"""
+        else:
+            status_msg = f"""
 🔒 **STATUT PREMIUM**
 
 {get_progress_bar()}
@@ -218,11 +280,26 @@ def status_command(message):
 📊 **Progression :**
 • Groupes : {total}/5
 
-🎁 **Il reste {5-total} groupes à ajouter pour débloquer le premium !**
+🎁 **Il reste {5-total} groupes à ajouter !**
 
-👇 **Ajoutez le bot à des groupes pour accélérer le processus :**
+👇 **Ajoutez le bot à des groupes ou activez le premium :**
 """
+        
         bot.reply_to(message, status_msg, parse_mode='Markdown', reply_markup=create_premium_menu())
+
+@bot.message_handler(commands=['activate'])
+def activate_command(message):
+    """Commande pour activer manuellement le premium"""
+    user_id = message.from_user.id
+    total = get_group_stats()
+    
+    if check_premium_access(user_id):
+        bot.reply_to(message, "✅ **Premium déjà activé !** Profitez-en ! 🚀")
+    elif total >= 5:
+        activate_premium_for_all()
+        bot.reply_to(message, "🎉 **Premium activé avec succès !**\n\n✨ **Toutes les fonctionnalités sont maintenant disponibles !**")
+    else:
+        bot.reply_to(message, f"❌ **Pas encore !** Il manque {5-total} groupe(s). Continuez à partager !")
 
 @bot.message_handler(commands=['photo'])
 def photo_handler(message):
@@ -302,14 +379,14 @@ def new_member_handler(message):
                 
                 # Vérifier déblocage premium
                 if check_group_requirements():
-                    activate_premium_for_all()
+                    # Le premium sera activé au prochain /start ou via le bouton
                     announcement = """
-🎉 **FÉLICITATIONS ! PREMIUM DÉBLOQUÉ !**
+🎊 **CONDITIONS REMPLIES !**
 
 ✅ 5 groupes atteints !
-🚀 **Version Premium activée pour tous !**
+🎁 **Le premium peut maintenant être activé !**
 
-✨ **Toutes les fonctionnalités disponibles !**
+✨ **Utilisez /start pour activer le premium !**
 """
                     try:
                         bot.send_message(group_id, announcement, parse_mode='Markdown')
@@ -333,7 +410,21 @@ def message_handler(message):
     # Vérifier premium
     if not check_premium_access(user_id):
         total = get_group_stats()
-        restriction_msg = f"""
+        
+        if total >= 5:
+            restriction_msg = f"""
+🎊 **PRÊT POUR LE PREMIUM !**
+
+{get_progress_bar()}
+
+✅ **5/5 groupes atteints !**
+
+🎁 **Cliquez sur 'Activer Premium' pour débloquer l'IA !**
+
+🚀 **Le bot est prêt à vous répondre !**
+"""
+        else:
+            restriction_msg = f"""
 🔒 **ACCÈS BLOQUÉ - VERSION LIMITÉE**
 
 🚫 **Le bot ne répond pas** sans premium.
@@ -344,6 +435,7 @@ def message_handler(message):
 
 🎁 **Ajoutez le bot à {5-total} groupe(s) pour débloquer !**
 """
+        
         bot.reply_to(message, restriction_msg, parse_mode='Markdown', reply_markup=create_premium_menu())
         return
     
@@ -427,11 +519,33 @@ def message_handler(message):
 def callback_handler(call):
     if call.data == "check_status":
         user_id = call.from_user.id
+        total = get_group_stats()
         if check_premium_access(user_id):
-            bot.answer_callback_query(call.id, "✅ Vous avez la version PREMIUM !")
+            bot.answer_callback_query(call.id, "✅ Premium activé !")
         else:
-            total = get_group_stats()
-            bot.answer_callback_query(call.id, f"📊 Progression: {total}/5 groupes")
+            bot.answer_callback_query(call.id, f"📊 {total}/5 groupes - {'Prêt pour premium!' if total >= 5 else 'En progression...'}")
+    
+    elif call.data == "activate_premium":
+        user_id = call.from_user.id
+        total = get_group_stats()
+        
+        if check_premium_access(user_id):
+            bot.answer_callback_query(call.id, "✅ Premium déjà activé !")
+        elif total >= 5:
+            activate_premium_for_all()
+            bot.answer_callback_query(call.id, "🎉 Premium activé ! Actualisez avec /start")
+            
+            # Message de confirmation
+            bot.send_message(
+                call.message.chat.id,
+                "🎉 **FÉLICITATIONS ! PREMIUM ACTIVÉ !**\n\n✨ **Toutes les fonctionnalités IA sont maintenant disponibles !**\n\n💬 **Envoyez-moi un message pour tester !**",
+                parse_mode='Markdown'
+            )
+        else:
+            bot.answer_callback_query(call.id, f"❌ {5-total} groupe(s) manquant(s)")
+    
+    elif call.data == "premium_active":
+        bot.answer_callback_query(call.id, "⭐ Premium activé - Profitez-en !")
 
 # ==================== DÉMARRAGE ====================
 if __name__ == "__main__":
@@ -441,6 +555,7 @@ if __name__ == "__main__":
 🎯 {BOT_NAME} - {VERSION}
 👑 Créateur : {CREATOR}
 🔒 Système Premium : 5 groupes requis
+🎁 Bouton Activation Premium ajouté
 ⚡ Modèle : {current_model}
 🚀 Prêt à fonctionner !
     """)
