@@ -18,7 +18,7 @@ GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 # 👑 IDENTITÉ
-CREATOR = "👑 Soszoe"
+CREATOR = "👑 Kervens"
 BOT_NAME = "🚀 KervensAI Pro"
 VERSION = "💎 Édition Groq Optimisée"
 MAIN_PHOTO = "https://files.catbox.moe/601u5z.jpg"
@@ -26,7 +26,7 @@ current_model = "llama-3.1-8b-instant"
 
 # 🔐 ADMIN
 ADMIN_ID = 7908680781
-ADMIN_USERNAME = "soszoe"
+ADMIN_USERNAME = "@soszoe"
 ADMIN_PASSWORD = "KING1998"
 
 # Stockage
