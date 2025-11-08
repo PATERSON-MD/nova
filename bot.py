@@ -33,7 +33,39 @@ user_sessions = {}
 admin_sessions = {}
 
 # ==================== BASE DE DONNÉES ====================
+def repair_database():
+    """Répare la structure de la base de données si besoin"""
+    try:
+        conn = sqlite3.connect('bot_groups.db')
+        c = conn.cursor()
+        
+        # Vérifier si la colonne username existe dans user_access
+        try:
+            c.execute('SELECT username FROM user_access LIMIT 1')
+        except sqlite3.OperationalError:
+            print("🔄 Ajout de la colonne username...")
+            c.execute('ALTER TABLE user_access ADD COLUMN username TEXT')
+            conn.commit()
+            print("✅ Colonne username ajoutée")
+        
+        # Vérifier si la colonne first_name existe
+        try:
+            c.execute('SELECT first_name FROM user_access LIMIT 1')
+        except sqlite3.OperationalError:
+            print("🔄 Ajout de la colonne first_name...")
+            c.execute('ALTER TABLE user_access ADD COLUMN first_name TEXT')
+            conn.commit()
+            print("✅ Colonne first_name ajoutée")
+        
+        conn.close()
+        return True
+        
+    except Exception as e:
+        print(f"❌ Erreur réparation DB: {e}")
+        return False
+
 def init_db():
+    """Initialise la base de données"""
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS groups
@@ -50,8 +82,12 @@ def init_db():
                   added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     conn.commit()
     conn.close()
+    
+    # Réparer la base de données existante
+    repair_database()
 
 def check_group_requirements():
+    """Vérifie si 5 groupes sont atteints"""
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     c.execute('SELECT COUNT(*) FROM groups')
@@ -60,6 +96,7 @@ def check_group_requirements():
     return total_groups >= 5
 
 def check_premium_access(user_id):
+    """Vérifie si un utilisateur a le premium"""
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     c.execute('SELECT has_premium FROM user_access WHERE user_id = ?', (user_id,))
@@ -68,6 +105,7 @@ def check_premium_access(user_id):
     return result and result[0]
 
 def activate_user_premium(user_id):
+    """Active le premium pour un utilisateur"""
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     c.execute('INSERT OR REPLACE INTO user_access (user_id, has_premium, premium_since) VALUES (?, ?, ?)', 
@@ -76,6 +114,7 @@ def activate_user_premium(user_id):
     conn.close()
 
 def deactivate_user_premium(user_id):
+    """Désactive le premium pour un utilisateur"""
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     c.execute('UPDATE user_access SET has_premium = FALSE, premium_since = NULL WHERE user_id = ?', (user_id,))
@@ -83,6 +122,7 @@ def deactivate_user_premium(user_id):
     conn.close()
 
 def get_all_users():
+    """Récupère tous les utilisateurs"""
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     c.execute('SELECT user_id, username, first_name, has_premium FROM user_access')
@@ -91,6 +131,7 @@ def get_all_users():
     return users
 
 def get_premium_users():
+    """Récupère les utilisateurs premium"""
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     c.execute('SELECT user_id, username, first_name FROM user_access WHERE has_premium = TRUE')
@@ -99,6 +140,7 @@ def get_premium_users():
     return users
 
 def get_user_info(user_id):
+    """Récupère les infos d'un utilisateur"""
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     c.execute('SELECT user_id, username, first_name, has_premium, premium_since FROM user_access WHERE user_id = ?', (user_id,))
@@ -107,6 +149,7 @@ def get_user_info(user_id):
     return result
 
 def get_group_stats():
+    """Récupère le nombre de groupes"""
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     c.execute('SELECT COUNT(*) FROM groups')
@@ -115,6 +158,7 @@ def get_group_stats():
     return total
 
 def add_group_to_db(group_id, group_name, member_count):
+    """Ajoute un groupe à la base"""
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     c.execute('''INSERT OR IGNORE INTO groups 
@@ -125,12 +169,15 @@ def add_group_to_db(group_id, group_name, member_count):
     conn.close()
 
 def is_admin(user_id):
+    """Vérifie si l'utilisateur est admin"""
     return user_id == ADMIN_ID
 
 def verify_admin_password(password):
+    """Vérifie le mot de passe admin"""
     return password == ADMIN_PASSWORD
 
 def is_admin_authenticated(user_id):
+    """Vérifie si l'admin est authentifié"""
     if user_id not in admin_sessions:
         return False
     session = admin_sessions[user_id]
@@ -141,6 +188,7 @@ def is_admin_authenticated(user_id):
 
 # ==================== FONCTIONS UTILISATEURS ====================
 def get_user_session(user_id):
+    """Gère les sessions utilisateur"""
     if user_id not in user_sessions:
         user_sessions[user_id] = {
             'conversation': [],
@@ -149,18 +197,21 @@ def get_user_session(user_id):
     return user_sessions[user_id]
 
 def get_progress_bar():
+    """Affiche une barre de progression"""
     total = get_group_stats()
     filled = '█' * min(total, 5)
     empty = '░' * (5 - min(total, 5))
     return f"`[{filled}{empty}]` {total}/5"
 
 def create_main_menu():
+    """Menu principal"""
     keyboard = InlineKeyboardMarkup()
     support_button = InlineKeyboardButton("💝 Support Créateur", url="https://t.me/Soszoe")
     keyboard.add(support_button)
     return keyboard
 
 def create_premium_menu():
+    """Menu pour débloquer le premium"""
     keyboard = InlineKeyboardMarkup()
     
     try:
@@ -183,6 +234,7 @@ def create_premium_menu():
     return keyboard
 
 def create_admin_menu():
+    """Menu administrateur"""
     keyboard = InlineKeyboardMarkup()
     stats_btn = InlineKeyboardButton("📊 Statistiques", callback_data="admin_stats")
     users_btn = InlineKeyboardButton("👥 Utilisateurs", callback_data="admin_users")
@@ -195,6 +247,7 @@ def create_admin_menu():
     return keyboard
 
 def create_optimized_prompt():
+    """Prompt pour l'IA"""
     return f"""Tu es {BOT_NAME}, assistant IA créé par {CREATOR}. Expert en programmation, création, analyse et aide générale. Sois naturel, précis et utile. Réponds dans la langue de l'utilisateur."""
 
 # ==================== HANDLERS UTILISATEURS ====================
@@ -226,6 +279,7 @@ def start_handler(message):
             )
             return
         
+        # Photo du créateur
         try:
             bot.send_photo(
                 message.chat.id, 
@@ -300,10 +354,12 @@ pour débloquer toutes les fonctionnalités !
 
 @bot.message_handler(commands=['test'])
 def test_command(message):
+    """Commande test"""
     bot.reply_to(message, "✅ **Bot actif !**")
 
 @bot.message_handler(commands=['reset'])
 def reset_handler(message):
+    """Réinitialise la conversation"""
     user_id = message.from_user.id
     if user_id in user_sessions:
         user_sessions[user_id]['conversation'] = []
@@ -312,6 +368,7 @@ def reset_handler(message):
 # ==================== GESTION GROUPES ====================
 @bot.message_handler(content_types=['new_chat_members'])
 def new_member_handler(message):
+    """Quand le bot est ajouté à un groupe"""
     try:
         if bot.get_me().id in [user.id for user in message.new_chat_members]:
             group_id = message.chat.id
@@ -340,6 +397,7 @@ def new_member_handler(message):
 # ==================== MOTEUR IA ====================
 @bot.message_handler(func=lambda message: True)
 def message_handler(message):
+    """Gère tous les messages"""
     if message.chat.type in ['group', 'supergroup']:
         return
         
@@ -407,6 +465,7 @@ def message_handler(message):
 # ==================== COMMANDES ADMIN ====================
 @bot.message_handler(commands=['admin'])
 def admin_command(message):
+    """Panel admin principal"""
     user_id = message.from_user.id
     if not is_admin(user_id):
         bot.reply_to(message, "❌ Accès réservé au propriétaire.")
@@ -416,6 +475,7 @@ def admin_command(message):
     bot.register_next_step_handler(msg, process_admin_password)
 
 def process_admin_password(message):
+    """Traite le mot de passe admin"""
     user_id = message.from_user.id
     if not is_admin(user_id):
         return
@@ -428,6 +488,7 @@ def process_admin_password(message):
 
 @bot.message_handler(commands=['stats'])
 def stats_command(message):
+    """Statistiques du bot"""
     user_id = message.from_user.id
     if not is_admin(user_id) or not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 Authentification requise. Utilisez /admin d'abord.")
@@ -453,6 +514,7 @@ def stats_command(message):
 
 @bot.message_handler(commands=['users'])
 def users_command(message):
+    """Lister tous les utilisateurs"""
     user_id = message.from_user.id
     if not is_admin(user_id) or not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 Authentification requise.")
@@ -477,6 +539,7 @@ def users_command(message):
 
 @bot.message_handler(commands=['premium_users'])
 def premium_users_command(message):
+    """Lister les utilisateurs premium"""
     user_id = message.from_user.id
     if not is_admin(user_id) or not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 Authentification requise.")
@@ -497,6 +560,7 @@ def premium_users_command(message):
 
 @bot.message_handler(commands=['give_premium'])
 def give_premium_command(message):
+    """Donner le premium à un utilisateur"""
     user_id = message.from_user.id
     if not is_admin(user_id) or not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 Authentification requise.")
@@ -506,6 +570,7 @@ def give_premium_command(message):
     bot.register_next_step_handler(msg, process_give_premium)
 
 def process_give_premium(message):
+    """Traite l'ajout de premium"""
     user_id = message.from_user.id
     if not is_admin(user_id) or not is_admin_authenticated(user_id):
         return
@@ -525,6 +590,7 @@ def process_give_premium(message):
 
 @bot.message_handler(commands=['remove_premium'])
 def remove_premium_command(message):
+    """Retirer le premium à un utilisateur"""
     user_id = message.from_user.id
     if not is_admin(user_id) or not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 Authentification requise.")
@@ -534,6 +600,7 @@ def remove_premium_command(message):
     bot.register_next_step_handler(msg, process_remove_premium)
 
 def process_remove_premium(message):
+    """Traite le retrait de premium"""
     user_id = message.from_user.id
     if not is_admin(user_id) or not is_admin_authenticated(user_id):
         return
@@ -547,6 +614,7 @@ def process_remove_premium(message):
 
 @bot.message_handler(commands=['user_info'])
 def user_info_command(message):
+    """Informations sur un utilisateur"""
     user_id = message.from_user.id
     if not is_admin(user_id) or not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 Authentification requise.")
@@ -556,6 +624,7 @@ def user_info_command(message):
     bot.register_next_step_handler(msg, process_user_info)
 
 def process_user_info(message):
+    """Traite la recherche d'utilisateur"""
     user_id = message.from_user.id
     if not is_admin(user_id) or not is_admin_authenticated(user_id):
         return
@@ -587,6 +656,7 @@ def process_user_info(message):
 
 @bot.message_handler(commands=['broadcast'])
 def broadcast_command(message):
+    """Envoyer un message à tous les utilisateurs"""
     user_id = message.from_user.id
     if not is_admin(user_id) or not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 Authentification requise.")
@@ -596,6 +666,7 @@ def broadcast_command(message):
     bot.register_next_step_handler(msg, process_broadcast)
 
 def process_broadcast(message):
+    """Traite le broadcast"""
     user_id = message.from_user.id
     if not is_admin(user_id) or not is_admin_authenticated(user_id):
         return
@@ -640,6 +711,7 @@ def process_broadcast(message):
 
 @bot.message_handler(commands=['premium_all'])
 def premium_all_command(message):
+    """Activer le premium pour tous"""
     user_id = message.from_user.id
     if not is_admin(user_id) or not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 Authentification requise.")
@@ -653,6 +725,7 @@ def premium_all_command(message):
 
 @bot.message_handler(commands=['remove_all_premium'])
 def remove_all_premium_command(message):
+    """Retirer le premium à tous (sauf admin)"""
     user_id = message.from_user.id
     if not is_admin(user_id) or not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 Authentification requise.")
@@ -668,6 +741,7 @@ def remove_all_premium_command(message):
 # ==================== CALLBACKS ====================
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
+    """Gère tous les callbacks"""
     user_id = call.from_user.id
     
     if call.data == "check_status":
@@ -773,8 +847,14 @@ def callback_handler(call):
 
 # ==================== DÉMARRAGE ====================
 if __name__ == "__main__":
+    print("🗃️ Initialisation de la base de données...")
     init_db()
+    print("✅ Base de données prête")
     print("🚀 Bot démarré avec succès!")
     print("👑 Commandes admin disponibles")
     print("🤖 En attente de messages...")
-    bot.infinity_polling()
+    
+    try:
+        bot.infinity_polling()
+    except Exception as e:
+        print(f"❌ Erreur: {e}")
