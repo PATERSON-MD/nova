@@ -24,8 +24,8 @@ VERSION = "💎 Édition LÉGENDAIRE"
 MAIN_PHOTO = "https://files.catbox.moe/601u5z.jpg"
 current_model = "llama-3.1-8b-instant"
 
-# 🔐 ADMIN - @soszoe EST L'ADMIN PERMANENT
-ADMIN_USERNAME = "soszoe"
+# 🔐 ADMIN - 7908680781 EST LE PROPRIÉTAIRE PERMANENT
+ADMIN_ID = 7908680781
 ADMIN_PASSWORD = "KING1998"
 
 # Stockage
@@ -254,9 +254,9 @@ def get_user_stats():
     }
 
 # ==================== FONCTIONS ADMIN ====================
-def is_admin(user_id, username):
-    """Vérifie si l'utilisateur est l'admin @soszoe"""
-    return username == ADMIN_USERNAME
+def is_owner(user_id):
+    """Vérifie si l'utilisateur est le propriétaire 7908680781"""
+    return user_id == ADMIN_ID
 
 def is_admin_authenticated(user_id):
     """Vérifie si l'admin est authentifié"""
@@ -306,16 +306,18 @@ def create_premium_menu():
     status_button = InlineKeyboardButton("📊 Vérifier le statut", callback_data="check_status")
     premium_button = InlineKeyboardButton("🎁 Activer Premium", callback_data="activate_premium")
     comment_button = InlineKeyboardButton("📝 Commentaire", callback_data="send_comment")
+    auth_button = InlineKeyboardButton("🔐 Auth Admin", callback_data="admin_auth")
     
     keyboard.add(add_button)
     keyboard.add(status_button)
     keyboard.add(premium_button)
     keyboard.add(comment_button)
+    keyboard.add(auth_button)
     
     return keyboard
 
 def create_owner_menu():
-    """Menu du propriétaire @soszoe"""
+    """Menu du propriétaire 7908680781"""
     keyboard = InlineKeyboardMarkup()
     
     # 📊 STATISTIQUES
@@ -422,16 +424,16 @@ def start_handler(message):
         
         register_user(user_id, username, first_name)
         
-        # Vérifier si c'est @soszoe (ADMIN PERMANENT)
-        if is_admin(user_id, username):
-            # @soszoe est TOUJOURS admin, pas besoin d'authentification
+        # Vérifier si c'est le propriétaire 7908680781
+        if is_owner(user_id):
+            # 7908680781 est TOUJOURS admin, pas besoin d'authentification
             admin_sessions[user_id] = {'authenticated': True, 'auth_time': datetime.now()}
             activate_user_premium(user_id)  # Premium automatique
             
             caption = f"""
 👑 **{BOT_NAME} - {VERSION}**
 
-💎 **BIENVENUE PROPRIÉTAIRE @soszoe !**
+💎 **BIENVENUE PROPRIÉTAIRE !**
 
 ⭐ **Premium LÉGENDAIRE activé**
 🔓 **Panel de contrôle COMPLET débloqué**
@@ -535,10 +537,9 @@ pour débloquer toutes les fonctionnalités !
 def auth_command(message):
     """Commande d'authentification pour les autres utilisateurs"""
     user_id = message.from_user.id
-    username = message.from_user.username or "Sans username"
     
-    # Si c'est @soszoe, il est déjà admin permanent
-    if is_admin(user_id, username):
+    # Si c'est 7908680781, il est déjà admin permanent
+    if is_owner(user_id):
         bot.reply_to(message, "👑 **Vous êtes déjà le propriétaire !**\n\nTout est déjà débloqué pour vous.")
         return
     
@@ -549,9 +550,10 @@ def process_auth(message):
     """Traite l'authentification pour les autres utilisateurs"""
     user_id = message.from_user.id
     username = message.from_user.username or "Sans username"
+    first_name = message.from_user.first_name or "Utilisateur"
     
-    # Empêcher @soszoe de s'authentifier (il l'est déjà)
-    if is_admin(user_id, username):
+    # Empêcher 7908680781 de s'authentifier (il l'est déjà)
+    if is_owner(user_id):
         bot.reply_to(message, "👑 **Vous êtes le propriétaire !**\n\nPas besoin d'authentification.")
         return
     
@@ -562,26 +564,26 @@ def process_auth(message):
         
         print(f"✅ Auth réussie pour {username}")
         
-        success_msg = """
-✅ **AUTHENTIFICATION RÉUSSIE !**
+        # ⭐⭐ MESSAGE DE BIENVENUE PERSONNALISÉ ⭐⭐
+        welcome_message = f"""
+🎉 **ADMINISTRATEUR BIENVENUE OOOOOO FAIS POUR MOI !** 🎉
 
-👑 **Accès administrateur activé !**
-⭐ **Premium automatiquement activé**
+👑 **{first_name}**, vous êtes maintenant **ADMINISTRATEUR** !
 
-🎯 **Commandes disponibles :**
-• /stats - Voir les statistiques
-• /users - Lister les utilisateurs  
-• /broadcast - Envoyer un message à tous
-• /premium_all - Donner premium à tous
+⭐ **Premium LÉGENDAIRE activé**
+🔓 **Toutes les commandes admin débloquées**
 
-💡 **Utilisez les boutons ci-dessous :**
+🚀 **Vous pouvez maintenant :**
+• 📊 Voir toutes les statistiques
+• 👥 Gérer tous les utilisateurs
+• ⭐ Donner/retirer le premium
+• 📢 Envoyer des broadcasts
+• 🔧 Utiliser les outils avancés
+
+💎 **Profitez de votre pouvoir !**
 """
-        bot.send_message(
-            message.chat.id, 
-            success_msg, 
-            parse_mode='Markdown',
-            reply_markup=create_owner_menu()
-        )
+        
+        send_legendary_photo(message.chat.id, welcome_message, create_owner_menu())
         
     else:
         print(f"❌ Auth échouée pour {username}")
@@ -589,12 +591,11 @@ def process_auth(message):
 
 @bot.message_handler(commands=['logout'])
 def logout_command(message):
-    """Déconnexion admin (sauf pour @soszoe)"""
+    """Déconnexion admin (sauf pour 7908680781)"""
     user_id = message.from_user.id
-    username = message.from_user.username or "Sans username"
     
-    # @soszoe ne peut pas se déconnecter
-    if is_admin(user_id, username):
+    # 7908680781 ne peut pas se déconnecter
+    if is_owner(user_id):
         bot.reply_to(message, "👑 **Vous êtes le propriétaire permanent !**\n\nImpossible de vous déconnecter.")
         return
     
@@ -608,10 +609,9 @@ def logout_command(message):
 def stats_command(message):
     """Statistiques du bot"""
     user_id = message.from_user.id
-    username = message.from_user.username or "Sans username"
     
     # Vérifier les droits admin
-    if not is_admin(user_id, username) and not is_admin_authenticated(user_id):
+    if not is_owner(user_id) and not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nUtilisez `/auth` pour vous authentifier.")
         return
     
@@ -630,7 +630,7 @@ def stats_command(message):
 📨 **Messages :** {total_messages}
 🕐 **MAJ :** {datetime.now().strftime('%H:%M %d/%m/%Y')}
 
-👑 **Propriétaire :** @{ADMIN_USERNAME}
+👑 **Propriétaire :** 7908680781
 """
     send_legendary_photo(message.chat.id, stats_text)
 
@@ -638,9 +638,8 @@ def stats_command(message):
 def users_command(message):
     """Lister les utilisateurs"""
     user_id = message.from_user.id
-    username = message.from_user.username or "Sans username"
     
-    if not is_admin(user_id, username) and not is_admin_authenticated(user_id):
+    if not is_owner(user_id) and not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nUtilisez `/auth` pour vous authentifier.")
         return
     
@@ -668,9 +667,8 @@ def users_command(message):
 def premium_all_command(message):
     """Donner le premium à tous"""
     user_id = message.from_user.id
-    username = message.from_user.username or "Sans username"
     
-    if not is_admin(user_id, username) and not is_admin_authenticated(user_id):
+    if not is_owner(user_id) and not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nUtilisez `/auth` pour vous authentifier.")
         return
     
@@ -685,9 +683,8 @@ def premium_all_command(message):
 def broadcast_command(message):
     """Envoyer un message à tous"""
     user_id = message.from_user.id
-    username = message.from_user.username or "Sans username"
     
-    if not is_admin(user_id, username) and not is_admin_authenticated(user_id):
+    if not is_owner(user_id) and not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nUtilisez `/auth` pour vous authentifier.")
         return
     
@@ -696,9 +693,8 @@ def broadcast_command(message):
 
 def process_broadcast(message):
     user_id = message.from_user.id
-    username = message.from_user.username or "Sans username"
     
-    if not is_admin(user_id, username) and not is_admin_authenticated(user_id):
+    if not is_owner(user_id) and not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 Authentification requise.")
         return
     
@@ -744,9 +740,8 @@ def process_broadcast(message):
 def mail_command(message):
     """Voir les messages reçus"""
     user_id = message.from_user.id
-    username = message.from_user.username or "Sans username"
     
-    if not is_admin(user_id, username) and not is_admin_authenticated(user_id):
+    if not is_owner(user_id) and not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nUtilisez `/auth` pour vous authentifier.")
         return
     
@@ -792,7 +787,6 @@ def show_mail_history(message, page=1):
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     user_id = call.from_user.id
-    username = call.from_user.username or "Sans username"
     
     # Callbacks utilisateurs normaux
     if call.data == "check_status":
@@ -826,12 +820,22 @@ def callback_handler(call):
         bot.register_next_step_handler(msg, process_comment)
         bot.answer_callback_query(call.id, "📝 Commentaire")
     
+    elif call.data == "admin_auth":
+        # Bouton Auth pour les utilisateurs normaux
+        if is_owner(user_id):
+            bot.answer_callback_query(call.id, "👑 Vous êtes déjà propriétaire !")
+            return
+            
+        msg = bot.send_message(call.message.chat.id, "🔐 **AUTHENTIFICATION ADMIN**\n\nEntrez le mot de passe :")
+        bot.register_next_step_handler(msg, process_auth_callback, call.message)
+        bot.answer_callback_query(call.id, "🔐 Auth Admin")
+    
     # Callbacks admin - Vérification des droits
     elif call.data.startswith("admin_"):
-        # Vérifier si c'est @soszoe ou un admin authentifié
-        if not is_admin(user_id, username) and not is_admin_authenticated(user_id):
-            bot.answer_callback_query(call.id, "🔐 Utilisez /auth")
-            bot.send_message(call.message.chat.id, "🔐 **Authentification requise.**\n\nUtilisez `/auth` pour vous authentifier.")
+        # Vérifier si c'est 7908680781 ou un admin authentifié
+        if not is_owner(user_id) and not is_admin_authenticated(user_id):
+            bot.answer_callback_query(call.id, "🔐 Utilisez Auth d'abord")
+            bot.send_message(call.message.chat.id, "🔐 **Authentification requise.**\n\nUtilisez le bouton 🔐 Auth Admin ou `/auth` pour vous authentifier.")
             return
         
         # Exécuter la commande admin
@@ -897,11 +901,53 @@ def callback_handler(call):
             )
             bot.answer_callback_query(call.id, "🔙 Retour")
 
-def process_give_premium(message):
+def process_auth_callback(message, original_message):
+    """Traite l'authentification depuis le bouton Auth"""
     user_id = message.from_user.id
     username = message.from_user.username or "Sans username"
+    first_name = message.from_user.first_name or "Utilisateur"
     
-    if not is_admin(user_id, username) and not is_admin_authenticated(user_id):
+    # Empêcher 7908680781 de s'authentifier (il l'est déjà)
+    if is_owner(user_id):
+        bot.reply_to(message, "👑 **Vous êtes le propriétaire !**\n\nPas besoin d'authentification.")
+        return
+    
+    if verify_admin_password(message.text.strip()):
+        # Authentification réussie pour autres utilisateurs
+        admin_sessions[user_id] = {'authenticated': True, 'auth_time': datetime.now()}
+        activate_user_premium(user_id)
+        
+        print(f"✅ Auth réussie pour {username}")
+        
+        # ⭐⭐ MESSAGE DE BIENVENUE PERSONNALISÉ ⭐⭐
+        welcome_message = f"""
+🎉 **ADMINISTRATEUR BIENVENUE OOOOOO FAIS POUR MOI !** 🎉
+
+👑 **{first_name}**, vous êtes maintenant **ADMINISTRATEUR** !
+
+⭐ **Premium LÉGENDAIRE activé**
+🔓 **Toutes les commandes admin débloquées**
+
+🚀 **Vous pouvez maintenant :**
+• 📊 Voir toutes les statistiques
+• 👥 Gérer tous les utilisateurs
+• ⭐ Donner/retirer le premium
+• 📢 Envoyer des broadcasts
+• 🔧 Utiliser les outils avancés
+
+💎 **Profitez de votre pouvoir !**
+"""
+        
+        send_legendary_photo(message.chat.id, welcome_message, create_owner_menu())
+        
+    else:
+        print(f"❌ Auth échouée pour {username}")
+        bot.reply_to(message, "❌ **Mot de passe incorrect.**\n\nUtilisez le bouton 🔐 Auth Admin pour réessayer.")
+
+def process_give_premium(message):
+    user_id = message.from_user.id
+    
+    if not is_owner(user_id) and not is_admin_authenticated(user_id):
         bot.reply_to(message, "🔐 Authentification requise.")
         return
     
@@ -930,8 +976,7 @@ def process_comment(message):
     
     save_user_message(user_id, username, first_name, comment_text)
     
-    # Notifier @soszoe
-    bot.reply_to(message, "✅ **Commentaire envoyé !**\n\nLe propriétaire @soszoe a été notifié !")
+    bot.reply_to(message, "✅ **Commentaire envoyé !**\n\nLe propriétaire a été notifié !")
 
 # ==================== GESTION GROUPES ====================
 @bot.message_handler(content_types=['new_chat_members'])
@@ -1052,9 +1097,10 @@ if __name__ == "__main__":
     print(f"🚀 {BOT_NAME} - {VERSION}")
     print(f"👑 Créateur: {CREATOR}")
     print("💎 SYSTÈME ADMIN PERMANENT ACTIVÉ")
-    print(f"   👑 Propriétaire: @{ADMIN_USERNAME}")
+    print(f"   👑 Propriétaire: {ADMIN_ID}")
     print("   🔑 Mot de passe admin: KING1998")
-    print("   ⭐ @soszoe a tout débloqué automatiquement")
+    print("   🔐 Bouton Auth disponible pour les autres")
+    print("   ⭐ 7908680781 a tout débloqué automatiquement")
     print("   📊 Panel complet avec tous les boutons")
     print("🤖 En attente de messages...")
     
