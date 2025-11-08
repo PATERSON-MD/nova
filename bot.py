@@ -33,46 +33,19 @@ user_sessions = {}
 admin_sessions = {}
 
 # ==================== BASE DE DONNÉES ====================
-def repair_database():
-    """Répare la structure de la base de données si besoin"""
-    try:
-        conn = sqlite3.connect('bot_groups.db')
-        c = conn.cursor()
-        
-        # Vérifier si la colonne username existe dans user_access
-        try:
-            c.execute('SELECT username FROM user_access LIMIT 1')
-        except sqlite3.OperationalError:
-            print("🔄 Ajout de la colonne username...")
-            c.execute('ALTER TABLE user_access ADD COLUMN username TEXT')
-            conn.commit()
-            print("✅ Colonne username ajoutée")
-        
-        # Vérifier si la colonne first_name existe
-        try:
-            c.execute('SELECT first_name FROM user_access LIMIT 1')
-        except sqlite3.OperationalError:
-            print("🔄 Ajout de la colonne first_name...")
-            c.execute('ALTER TABLE user_access ADD COLUMN first_name TEXT')
-            conn.commit()
-            print("✅ Colonne first_name ajoutée")
-        
-        conn.close()
-        return True
-        
-    except Exception as e:
-        print(f"❌ Erreur réparation DB: {e}")
-        return False
-
 def init_db():
     """Initialise la base de données"""
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
+    
+    # Table des groupes
     c.execute('''CREATE TABLE IF NOT EXISTS groups
                  (group_id INTEGER PRIMARY KEY, 
                   group_name TEXT,
                   member_count INTEGER,
                   added_date TIMESTAMP)''')
+    
+    # Table des utilisateurs
     c.execute('''CREATE TABLE IF NOT EXISTS user_access
                  (user_id INTEGER PRIMARY KEY,
                   username TEXT,
@@ -80,11 +53,46 @@ def init_db():
                   has_premium BOOLEAN DEFAULT FALSE,
                   premium_since TIMESTAMP,
                   added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
+    # Table des statistiques
+    c.execute('''CREATE TABLE IF NOT EXISTS bot_stats
+                 (id INTEGER PRIMARY KEY,
+                  total_messages INTEGER DEFAULT 0,
+                  total_users INTEGER DEFAULT 0,
+                  last_update TIMESTAMP)''')
+    
     conn.commit()
     conn.close()
-    
-    # Réparer la base de données existante
-    repair_database()
+    print("✅ Base de données initialisée")
+
+def repair_database():
+    """Répare la structure de la base de données"""
+    try:
+        conn = sqlite3.connect('bot_groups.db')
+        c = conn.cursor()
+        
+        # Vérifier et ajouter les colonnes manquantes
+        columns_to_add = [
+            ('user_access', 'username', 'TEXT'),
+            ('user_access', 'first_name', 'TEXT'),
+            ('user_access', 'premium_since', 'TIMESTAMP')
+        ]
+        
+        for table, column, col_type in columns_to_add:
+            try:
+                c.execute(f'SELECT {column} FROM {table} LIMIT 1')
+            except sqlite3.OperationalError:
+                print(f"🔄 Ajout de la colonne {column}...")
+                c.execute(f'ALTER TABLE {table} ADD COLUMN {column} {col_type}')
+                conn.commit()
+                print(f"✅ Colonne {column} ajoutée")
+        
+        conn.close()
+        return True
+        
+    except Exception as e:
+        print(f"❌ Erreur réparation DB: {e}")
+        return False
 
 def check_group_requirements():
     """Vérifie si 5 groupes sont atteints"""
@@ -108,8 +116,9 @@ def activate_user_premium(user_id):
     """Active le premium pour un utilisateur"""
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
-    c.execute('INSERT OR REPLACE INTO user_access (user_id, has_premium, premium_since) VALUES (?, ?, ?)', 
-              (user_id, True, datetime.now()))
+    c.execute('''INSERT OR REPLACE INTO user_access 
+                 (user_id, has_premium, premium_since) VALUES (?, ?, ?)''', 
+                 (user_id, True, datetime.now()))
     conn.commit()
     conn.close()
 
@@ -168,6 +177,18 @@ def add_group_to_db(group_id, group_name, member_count):
     conn.commit()
     conn.close()
 
+def register_user(user_id, username, first_name):
+    """Enregistre un utilisateur"""
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    c.execute('''INSERT OR REPLACE INTO user_access 
+                 (user_id, username, first_name, added_date) 
+                 VALUES (?, ?, ?, ?)''', 
+                 (user_id, username, first_name, datetime.now()))
+    conn.commit()
+    conn.close()
+
+# ==================== FONCTIONS ADMIN ====================
 def is_admin(user_id):
     """Vérifie si l'utilisateur est admin"""
     return user_id == ADMIN_ID
@@ -181,7 +202,7 @@ def is_admin_authenticated(user_id):
     if user_id not in admin_sessions:
         return False
     session = admin_sessions[user_id]
-    if (datetime.now() - session['auth_time']).total_seconds() > 1800:
+    if (datetime.now() - session['auth_time']).total_seconds() > 1800:  # 30 minutes
         del admin_sessions[user_id]
         return False
     return session['authenticated']
@@ -219,7 +240,7 @@ def create_premium_menu():
         bot_username = bot_user.username
         add_button = InlineKeyboardButton(
             "📥 Ajouter à un groupe", 
-            url=f"https://t.me/{bot_username}?startgroup=true" if bot_username else f"https://t.me/{bot_user.id}?startgroup=true"
+            url=f"https://t.me/{bot_username}?startgroup=true"
         )
     except:
         add_button = InlineKeyboardButton("📥 Ajouter à un groupe", url="https://t.me/")
@@ -251,22 +272,15 @@ def create_optimized_prompt():
     return f"""Tu es {BOT_NAME}, assistant IA créé par {CREATOR}. Expert en programmation, création, analyse et aide générale. Sois naturel, précis et utile. Réponds dans la langue de l'utilisateur."""
 
 # ==================== HANDLERS UTILISATEURS ====================
-@bot.message_handler(commands=['start', 'aide'])
+@bot.message_handler(commands=['start', 'aide', 'help'])
 def start_handler(message):
     try:
         user_id = message.from_user.id
-        username = message.from_user.username
-        first_name = message.from_user.first_name
+        username = message.from_user.username or "Utilisateur"
+        first_name = message.from_user.first_name or "Utilisateur"
         
         # Enregistrer l'utilisateur
-        conn = sqlite3.connect('bot_groups.db')
-        c = conn.cursor()
-        c.execute('''INSERT OR REPLACE INTO user_access 
-                     (user_id, username, first_name, added_date) 
-                     VALUES (?, ?, ?, ?)''', 
-                     (user_id, username, first_name, datetime.now()))
-        conn.commit()
-        conn.close()
+        register_user(user_id, username, first_name)
         
         # ✅ PROPRIÉTAIRE - Premium immédiat
         if is_admin(user_id):
@@ -355,7 +369,7 @@ pour débloquer toutes les fonctionnalités !
 @bot.message_handler(commands=['test'])
 def test_command(message):
     """Commande test"""
-    bot.reply_to(message, "✅ **Bot actif !**")
+    bot.reply_to(message, "✅ **Bot actif !**\n🚀 Fonctionne parfaitement !")
 
 @bot.message_handler(commands=['reset'])
 def reset_handler(message):
@@ -363,7 +377,20 @@ def reset_handler(message):
     user_id = message.from_user.id
     if user_id in user_sessions:
         user_sessions[user_id]['conversation'] = []
-    bot.reply_to(message, "🔄 **Conversation réinitialisée !**")
+    bot.reply_to(message, "🔄 **Conversation réinitialisée !**\nNouveau départ !")
+
+@bot.message_handler(commands=['status'])
+def status_handler(message):
+    """Vérifie le statut"""
+    user_id = message.from_user.id
+    total = get_group_stats()
+    
+    if check_premium_access(user_id):
+        bot.reply_to(message, "⭐ **Statut : PREMIUM ACTIVÉ**\n✨ Profitez de l'IA complète !")
+    else:
+        bot.reply_to(message, 
+                   f"🔒 **Statut : VERSION LIMITÉE**\n\n{get_progress_bar()}\n\nAjoutez le bot à {5-total} groupe(s) pour débloquer le premium.",
+                   reply_markup=create_premium_menu())
 
 # ==================== GESTION GROUPES ====================
 @bot.message_handler(content_types=['new_chat_members'])
@@ -372,7 +399,7 @@ def new_member_handler(message):
     try:
         if bot.get_me().id in [user.id for user in message.new_chat_members]:
             group_id = message.chat.id
-            group_name = message.chat.title
+            group_name = message.chat.title or "Groupe sans nom"
             
             try:
                 member_count = bot.get_chat_members_count(group_id)
@@ -388,6 +415,8 @@ def new_member_handler(message):
 🚀 Assistant IA optimisé
 
 📊 **Ce groupe compte pour le déblocage du premium gratuit !**
+
+💡 Utilisez /start en privé pour voir votre progression.
 """
             bot.send_message(group_id, welcome_msg, parse_mode='Markdown')
             
@@ -415,7 +444,7 @@ def message_handler(message):
                        reply_markup=create_premium_menu())
         return
     
-    # ✅ UTILISATEUR PREMIUM
+    # ✅ UTILISATEUR PREMIUM - Traitement IA
     try:
         bot.send_chat_action(message.chat.id, 'typing')
         
@@ -429,38 +458,51 @@ def message_handler(message):
         
         messages = [{"role": "system", "content": create_optimized_prompt()}]
         if user_session['conversation']:
-            messages.extend(user_session['conversation'][-2:])
+            messages.extend(user_session['conversation'][-4:])  # Garde les 4 derniers messages
         
-        user_message = message.text[:400]
+        user_message = message.text[:500]  # Limite la longueur
         messages.append({"role": "user", "content": user_message})
 
         payload = {
             "messages": messages,
             "model": current_model,
-            "max_tokens": 800,
-            "temperature": 0.7
+            "max_tokens": 1024,
+            "temperature": 0.7,
+            "top_p": 0.9
         }
 
-        response = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=15)
+        response = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=20)
         
         if response.status_code == 200:
             answer = response.json()["choices"][0]["message"]["content"]
             
+            # Mise à jour de la conversation
             user_session['conversation'].extend([
-                {"role": "user", "content": user_message[:200]},
-                {"role": "assistant", "content": answer[:500]}
+                {"role": "user", "content": user_message[:300]},
+                {"role": "assistant", "content": answer[:600]}
             ])
             
-            if len(user_session['conversation']) > 6:
-                user_session['conversation'] = user_session['conversation'][-6:]
+            # Limite la taille de la conversation
+            if len(user_session['conversation']) > 8:
+                user_session['conversation'] = user_session['conversation'][-8:]
+            
+            user_session['last_active'] = datetime.now()
             
             bot.reply_to(message, answer)
         else:
-            bot.reply_to(message, "❌ Erreur de service. Réessayez.")
+            error_msg = "❌ Erreur de service. Réessayez dans quelques instants."
+            if response.status_code == 429:
+                error_msg = "⏰ Trop de requêtes. Veuillez patienter quelques secondes."
+            elif response.status_code == 401:
+                error_msg = "🔑 Erreur d'authentification API."
             
+            bot.reply_to(message, error_msg)
+            
+    except requests.exceptions.Timeout:
+        bot.reply_to(message, "⏰ Délai d'attente dépassé. Réessayez.")
     except Exception as e:
         print(f"❌ Erreur IA: {e}")
-        bot.reply_to(message, "⏰ Service temporairement indisponible.")
+        bot.reply_to(message, "🔧 Service temporairement indisponible. Réessayez plus tard.")
 
 # ==================== COMMANDES ADMIN ====================
 @bot.message_handler(commands=['admin'])
@@ -482,7 +524,8 @@ def process_admin_password(message):
     
     if verify_admin_password(message.text.strip()):
         admin_sessions[user_id] = {'authenticated': True, 'auth_time': datetime.now()}
-        bot.send_message(message.chat.id, "✅ **Authentification réussie !**", reply_markup=create_admin_menu())
+        bot.send_message(message.chat.id, "✅ **Authentification réussie !**\n\nBienvenue dans le panel administrateur.", 
+                        reply_markup=create_admin_menu())
     else:
         bot.reply_to(message, "❌ **Mot de passe incorrect.**")
 
@@ -509,6 +552,8 @@ def stats_command(message):
 
 📁 **Groupes :** {groups_count}/5
 🕐 **Dernière MAJ :** {datetime.now().strftime('%H:%M %d/%m/%Y')}
+
+👑 **Admin :** {CREATOR}
 """
     bot.reply_to(message, stats_text, parse_mode='Markdown')
 
@@ -526,14 +571,14 @@ def users_command(message):
         return
     
     response = "👥 **LISTE DES UTILISATEURS**\n\n"
-    for i, user in enumerate(users[:30], 1):
+    for i, user in enumerate(users[:20], 1):
         user_id, username, first_name, has_premium = user
         premium_status = "⭐" if has_premium else "🔒"
         username_display = f"@{username}" if username else "Sans username"
         response += f"{i}. {premium_status} {first_name} ({username_display}) - ID: `{user_id}`\n"
     
-    if len(users) > 30:
-        response += f"\n... et {len(users) - 30} autres utilisateurs"
+    if len(users) > 20:
+        response += f"\n... et {len(users) - 20} autres utilisateurs"
     
     bot.reply_to(message, response, parse_mode='Markdown')
 
@@ -580,7 +625,8 @@ def process_give_premium(message):
         activate_user_premium(target_user_id)
         
         try:
-            bot.send_message(target_user_id, "🎉 **FÉLICITATIONS !**\n\n⭐ **Premium activé !**\n✨ Profitez de l'IA !")
+            bot.send_message(target_user_id, 
+                           "🎉 **FÉLICITATIONS !**\n\n⭐ **Premium activé !**\n\n✨ Profitez de toutes les fonctionnalités IA !\n💬 Envoyez-moi un message pour commencer !")
         except:
             pass
         
@@ -636,7 +682,7 @@ def process_user_info(message):
         if user_info:
             user_id, username, first_name, has_premium, premium_since = user_info
             premium_status = "⭐ PREMIUM" if has_premium else "🔒 STANDARD"
-            since = premium_since or "Non premium"
+            since = premium_since.strftime("%d/%m/%Y %H:%M") if premium_since else "Non premium"
             username_display = f"@{username}" if username else "Aucun"
             
             response = f"""
@@ -732,11 +778,13 @@ def remove_all_premium_command(message):
         return
     
     users = get_all_users()
+    count = 0
     for user in users:
         if user[0] != ADMIN_ID:
             deactivate_user_premium(user[0])
+            count += 1
     
-    bot.reply_to(message, f"🔒 **Premium retiré à tous les utilisateurs sauf vous !**")
+    bot.reply_to(message, f"🔒 **Premium retiré à {count} utilisateurs !**")
 
 # ==================== CALLBACKS ====================
 @bot.callback_query_handler(func=lambda call: True)
@@ -749,16 +797,24 @@ def callback_handler(call):
         if check_premium_access(user_id):
             bot.answer_callback_query(call.id, "✅ Premium activé !")
         else:
-            bot.answer_callback_query(call.id, f"📊 {total}/5 groupes")
+            bot.answer_callback_query(call.id, f"📊 {total}/5 groupes - {5-total} manquant(s)")
     
     elif call.data == "activate_premium":
         total = get_group_stats()
         if total >= 5:
-            if activate_user_premium(user_id):
-                bot.answer_callback_query(call.id, "🎉 Premium activé !")
-                bot.send_message(call.message.chat.id, "🎉 **Premium activé avec succès !**\n\n✨ **Profitez de toutes les fonctionnalités IA !**")
-            else:
-                bot.answer_callback_query(call.id, "❌ Erreur activation")
+            activate_user_premium(user_id)
+            bot.answer_callback_query(call.id, "🎉 Premium activé !")
+            
+            try:
+                bot.edit_message_text(
+                    chat_id=call.message.chat.id,
+                    message_id=call.message.message_id,
+                    text="🎉 **Premium activé avec succès !**\n\n✨ **Profitez de toutes les fonctionnalités IA !**\n💬 Envoyez-moi un message pour commencer !",
+                    parse_mode='Markdown',
+                    reply_markup=create_main_menu()
+                )
+            except:
+                bot.send_message(call.message.chat.id, "🎉 **Premium activé avec succès !**\n\n✨ Profitez de l'IA !")
         else:
             bot.answer_callback_query(call.id, f"❌ {5-total} groupe(s) manquant(s)")
     
@@ -771,7 +827,14 @@ def callback_handler(call):
         premium_users = len(get_premium_users())
         groups_count = get_group_stats()
         
-        stats_text = f"📊 **STATISTIQUES**\n\n👥 Utilisateurs: {total_users}\n⭐ Premium: {premium_users}\n📁 Groupes: {groups_count}/5"
+        stats_text = f"""
+📊 **STATISTIQUES ADMIN**
+
+👥 Utilisateurs: {total_users}
+⭐ Premium: {premium_users}
+📁 Groupes: {groups_count}/5
+🕐 MAJ: {datetime.now().strftime('%H:%M %d/%m/%Y')}
+"""
         bot.answer_callback_query(call.id, "📊 Statistiques")
         bot.send_message(call.message.chat.id, stats_text, parse_mode='Markdown')
     
@@ -782,10 +845,14 @@ def callback_handler(call):
         
         users = get_all_users()
         response = "👥 **UTILISATEURS**\n\n"
-        for i, user in enumerate(users[:10], 1):
+        for i, user in enumerate(users[:15], 1):
             user_id, username, first_name, has_premium = user
             status = "⭐" if has_premium else "🔒"
-            response += f"{i}. {status} {first_name} - ID: `{user_id}`\n"
+            username_display = f"@{username}" if username else "Sans username"
+            response += f"{i}. {status} {first_name} ({username_display}) - ID: `{user_id}`\n"
+        
+        if len(users) > 15:
+            response += f"\n... et {len(users) - 15} autres"
         
         bot.answer_callback_query(call.id, "👥 Utilisateurs")
         bot.send_message(call.message.chat.id, response, parse_mode='Markdown')
@@ -796,12 +863,13 @@ def callback_handler(call):
             return
         
         keyboard = InlineKeyboardMarkup()
-        give_btn = InlineKeyboardButton("➕ Donner Premium", callback_data="admin_give_premium_menu")
-        remove_btn = InlineKeyboardButton("➖ Retirer Premium", callback_data="admin_remove_premium_menu")
-        all_btn = InlineKeyboardButton("⭐ À Tous", callback_data="admin_premium_all_menu")
+        give_btn = InlineKeyboardButton("➕ Donner Premium", callback_data="admin_give_premium")
+        remove_btn = InlineKeyboardButton("➖ Retirer Premium", callback_data="admin_remove_premium")
+        all_btn = InlineKeyboardButton("⭐ À Tous", callback_data="admin_premium_all")
+        remove_all_btn = InlineKeyboardButton("🔒 Retirer à Tous", callback_data="admin_remove_all_premium")
         
         keyboard.add(give_btn, remove_btn)
-        keyboard.add(all_btn)
+        keyboard.add(all_btn, remove_all_btn)
         
         bot.answer_callback_query(call.id, "⭐ Gestion Premium")
         bot.send_message(call.message.chat.id, "⭐ **GESTION PREMIUM**", reply_markup=keyboard)
@@ -811,11 +879,11 @@ def callback_handler(call):
             bot.answer_callback_query(call.id, "🔐 Authentification requise")
             return
         
-        msg = bot.send_message(call.message.chat.id, "📢 **BROADCAST**\n\nEnvoyez le message :")
+        msg = bot.send_message(call.message.chat.id, "📢 **BROADCAST**\n\nEnvoyez le message à diffuser :")
         bot.register_next_step_handler(msg, process_broadcast)
         bot.answer_callback_query(call.id, "📢 Broadcast")
     
-    elif call.data == "admin_give_premium_menu":
+    elif call.data == "admin_give_premium":
         if not is_admin(user_id) or not is_admin_authenticated(user_id):
             bot.answer_callback_query(call.id, "🔐 Authentification requise")
             return
@@ -824,7 +892,7 @@ def callback_handler(call):
         bot.register_next_step_handler(msg, process_give_premium)
         bot.answer_callback_query(call.id, "➕ Donner Premium")
     
-    elif call.data == "admin_remove_premium_menu":
+    elif call.data == "admin_remove_premium":
         if not is_admin(user_id) or not is_admin_authenticated(user_id):
             bot.answer_callback_query(call.id, "🔐 Authentification requise")
             return
@@ -833,7 +901,7 @@ def callback_handler(call):
         bot.register_next_step_handler(msg, process_remove_premium)
         bot.answer_callback_query(call.id, "➖ Retirer Premium")
     
-    elif call.data == "admin_premium_all_menu":
+    elif call.data == "admin_premium_all":
         if not is_admin(user_id) or not is_admin_authenticated(user_id):
             bot.answer_callback_query(call.id, "🔐 Authentification requise")
             return
@@ -844,17 +912,36 @@ def callback_handler(call):
         
         bot.answer_callback_query(call.id, "✅ Premium à tous")
         bot.send_message(call.message.chat.id, f"⭐ **Premium activé pour tous les {len(users)} utilisateurs !**")
+    
+    elif call.data == "admin_remove_all_premium":
+        if not is_admin(user_id) or not is_admin_authenticated(user_id):
+            bot.answer_callback_query(call.id, "🔐 Authentification requise")
+            return
+        
+        users = get_all_users()
+        count = 0
+        for user in users:
+            if user[0] != ADMIN_ID:
+                deactivate_user_premium(user[0])
+                count += 1
+        
+        bot.answer_callback_query(call.id, "🔒 Premium retiré")
+        bot.send_message(call.message.chat.id, f"🔒 **Premium retiré à {count} utilisateurs !**")
 
 # ==================== DÉMARRAGE ====================
 if __name__ == "__main__":
     print("🗃️ Initialisation de la base de données...")
     init_db()
+    repair_database()
     print("✅ Base de données prête")
-    print("🚀 Bot démarré avec succès!")
-    print("👑 Commandes admin disponibles")
+    print(f"🚀 {BOT_NAME} - {VERSION}")
+    print(f"👑 Créateur: {CREATOR}")
+    print("📊 Commandes admin disponibles")
     print("🤖 En attente de messages...")
     
     try:
         bot.infinity_polling()
     except Exception as e:
         print(f"❌ Erreur: {e}")
+        print("🔄 Redémarrage dans 5 secondes...")
+        time.sleep(5)
