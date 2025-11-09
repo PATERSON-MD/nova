@@ -35,11 +35,11 @@ user_sessions = {}
 
 # ==================== BASE DE DONNÉES ====================
 def init_db():
-    """Initialise la base de données avec toutes les colonnes"""
+    """Initialise la base de données avec vérification des colonnes"""
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     
-    # Table des utilisateurs avec système de parrainage - TOUTES LES COLONNES
+    # Table des utilisateurs
     c.execute('''CREATE TABLE IF NOT EXISTS user_access
                  (user_id INTEGER PRIMARY KEY,
                   username TEXT,
@@ -67,7 +67,7 @@ def init_db():
     
     conn.commit()
     conn.close()
-    print("✅ Base de données initialisée avec toutes les colonnes")
+    print("✅ Base de données initialisée")
 
 def check_premium_access(user_id):
     conn = sqlite3.connect('bot_groups.db')
@@ -81,9 +81,9 @@ def activate_user_premium(user_id):
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     c.execute('''INSERT OR REPLACE INTO user_access 
-                 (user_id, username, first_name, has_premium, premium_since, last_activity) 
-                 VALUES (?, ?, ?, ?, ?, ?)''', 
-                 (user_id, "user", "User", True, datetime.now(), datetime.now()))
+                 (user_id, has_premium, premium_since, last_activity) 
+                 VALUES (?, ?, ?, ?)''', 
+                 (user_id, True, datetime.now(), datetime.now()))
     conn.commit()
     conn.close()
 
@@ -124,6 +124,7 @@ def register_user(user_id, username, first_name, referrer_id=None):
                      (user_id, username, first_name, added_date, last_activity) 
                      VALUES (?, ?, ?, ?, ?)''', 
                      (user_id, username, first_name, datetime.now(), datetime.now()))
+        print(f"➕ Nouvel utilisateur: {user_id} - {first_name}")
     else:
         # Mettre à jour l'activité
         c.execute('UPDATE user_access SET last_activity = ? WHERE user_id = ?', 
@@ -131,15 +132,22 @@ def register_user(user_id, username, first_name, referrer_id=None):
     
     # Enregistrer le parrainage si applicable
     if referrer_id and referrer_id != user_id:
-        c.execute('INSERT OR IGNORE INTO referrals (referrer_id, referred_user_id) VALUES (?, ?)', 
+        # Vérifier si le parrainage n'existe pas déjà
+        c.execute('SELECT id FROM referrals WHERE referrer_id = ? AND referred_user_id = ?', 
                  (referrer_id, user_id))
-        increment_referral_count(referrer_id)
+        existing_ref = c.fetchone()
+        
+        if not existing_ref:
+            c.execute('INSERT INTO referrals (referrer_id, referred_user_id) VALUES (?, ?)', 
+                     (referrer_id, user_id))
+            increment_referral_count(referrer_id)
+            print(f"📤 Parrainage: {referrer_id} -> {user_id}")
     
     conn.commit()
     conn.close()
 
 def update_user_activity(user_id):
-    """Met à jour l'activité de l'utilisateur"""
+    """Met à jour l'activité de l'utilisateur - RÉEL"""
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     
@@ -148,40 +156,49 @@ def update_user_activity(user_id):
               (datetime.now(), user_id))
     
     # Incrémenter le compteur de messages pour aujourd'hui
-    c.execute('''INSERT OR REPLACE INTO user_activity (user_id, message_count, activity_date) 
-                 VALUES (?, COALESCE((SELECT message_count FROM user_activity WHERE user_id = ? AND activity_date = DATE('now')), 0) + 1, DATE('now'))''', 
-                 (user_id, user_id))
+    today = datetime.now().strftime('%Y-%m-%d')
+    c.execute('''INSERT OR REPLACE INTO user_activity (user_id, activity_date, message_count)
+                 VALUES (?, ?, COALESCE(
+                     (SELECT message_count FROM user_activity WHERE user_id = ? AND activity_date = ?),
+                     0
+                 ) + 1)''', (user_id, today, user_id, today))
     
     conn.commit()
     conn.close()
 
 def get_monthly_users():
-    """Compte les utilisateurs actifs du mois en cours (RÉEL)"""
+    """Compte les utilisateurs actifs du mois en cours - RÉEL"""
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     
-    # Utilisateurs uniques qui ont eu une activité ce mois-ci
-    first_day_of_month = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    # Premier jour du mois en cours
+    first_day = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    first_day_str = first_day.strftime('%Y-%m-%d')
     
     c.execute('''SELECT COUNT(DISTINCT user_id) FROM user_activity 
-                 WHERE activity_date >= ?''', (first_day_of_month,))
+                 WHERE activity_date >= ?''', (first_day_str,))
     
     result = c.fetchone()
     conn.close()
     
-    return result[0] if result else 0
+    count = result[0] if result else 0
+    print(f"📊 Utilisateurs mensuels réels: {count}")
+    return count
 
 def get_total_users():
-    """Compte le nombre total d'utilisateurs enregistrés"""
+    """Compte le nombre total d'utilisateurs enregistrés - RÉEL"""
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     c.execute('SELECT COUNT(*) FROM user_access')
     result = c.fetchone()
     conn.close()
-    return result[0] if result else 0
+    
+    count = result[0] if result else 0
+    print(f"📊 Total utilisateurs réels: {count}")
+    return count
 
 def get_active_users_last_30_days():
-    """Compte les utilisateurs actifs dans les 30 derniers jours"""
+    """Compte les utilisateurs actifs dans les 30 derniers jours - RÉEL"""
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     
@@ -193,10 +210,12 @@ def get_active_users_last_30_days():
     result = c.fetchone()
     conn.close()
     
-    return result[0] if result else 0
+    count = result[0] if result else 0
+    print(f"📊 Actifs 30 jours réels: {count}")
+    return count
 
 def get_daily_stats():
-    """Statistiques d'usage du jour"""
+    """Statistiques d'usage du jour - RÉEL"""
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     
@@ -204,14 +223,17 @@ def get_daily_stats():
     
     # Messages aujourd'hui
     c.execute('SELECT SUM(message_count) FROM user_activity WHERE activity_date = ?', (today,))
-    today_messages = c.fetchone()[0] or 0
+    result = c.fetchone()
+    today_messages = result[0] if result and result[0] else 0
     
     # Utilisateurs actifs aujourd'hui
     c.execute('SELECT COUNT(DISTINCT user_id) FROM user_activity WHERE activity_date = ?', (today,))
-    today_users = c.fetchone()[0] or 0
+    result = c.fetchone()
+    today_users = result[0] if result else 0
     
     conn.close()
     
+    print(f"📊 Aujourd'hui: {today_users} users, {today_messages} messages")
     return today_users, today_messages
 
 # ==================== FONCTIONS ADMIN ====================
@@ -226,12 +248,14 @@ def get_progress_bar(referrals_count):
     return f"`[{filled}{empty}]` {referrals_count}/5"
 
 def get_header_stats():
-    """Retourne les statistiques pour l'en-tête"""
+    """Retourne les statistiques RÉELLES pour l'en-tête"""
     monthly_users = get_monthly_users()
     total_users = get_total_users()
     today_users, today_messages = get_daily_stats()
     
-    return f"👥 {monthly_users} utilisateurs mensuels • 📊 {total_users} total • 🔥 {today_users} actifs aujourd'hui"
+    stats = f"👥 {monthly_users} utilisateurs mensuels • 📊 {total_users} total • 🔥 {today_users} actifs aujourd'hui"
+    print(f"📈 En-tête stats: {stats}")
+    return stats
 
 def create_main_menu():
     keyboard = InlineKeyboardMarkup()
@@ -243,13 +267,10 @@ def create_premium_menu(user_id=None):
     """Menu premium avec lien de parrainage"""
     keyboard = InlineKeyboardMarkup()
     
-    # Bouton pour partager le lien affilié
     share_button = InlineKeyboardButton("📤 Partager le Lien", 
                                       url=f"https://t.me/share/url?url={AFFILIATE_LINK}?start={user_id}&text=🚀 Découvrez KervensAI Pro - L'IA la plus puissante sur Telegram !")
     
-    # Bouton pour copier le lien
     copy_button = InlineKeyboardButton("📋 Copier le Lien", callback_data="copy_link")
-    
     status_button = InlineKeyboardButton("📊 Vérifier le statut", callback_data="check_status")
     premium_button = InlineKeyboardButton("🎁 Activer Premium", callback_data="activate_premium")
     
@@ -651,6 +672,7 @@ def message_handler(message):
         
     user_id = message.from_user.id
     
+    # Mettre à jour l'activité RÉELLE
     update_user_activity(user_id)
     
     if not check_premium_access(user_id):
@@ -716,10 +738,10 @@ if __name__ == "__main__":
     print("✅ Base prête")
     print(f"🚀 {BOT_NAME} - {VERSION}")
     print(f"👑 Créateur: {CREATOR}")
-    print("💎 SYSTÈME COMPLET ACTIVÉ")
+    print("💎 STATISTIQUES 100% RÉELLES")
     print(f"   👑 Propriétaire: {ADMIN_ID}")
     print(f"   🔗 Lien: {AFFILIATE_LINK}")
-    print("   📊 Stats en temps réel")
+    print("   📊 Pas de simulation - Données réelles")
     print("   📤 Parrainage: 5 = Premium")
     print("🤖 En attente de messages...")
     
