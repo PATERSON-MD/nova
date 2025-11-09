@@ -265,6 +265,10 @@ def is_owner(user_id):
     """Vérifie si l'utilisateur est le propriétaire 7908680781"""
     return user_id == ADMIN_ID
 
+def has_admin_access(user_id):
+    """Vérifie l'accès admin - 7908680781 a TOUJOURS accès"""
+    return user_id == ADMIN_ID
+
 # ==================== FONCTIONS UTILISATEURS ====================
 def get_user_session(user_id):
     if user_id not in user_sessions:
@@ -522,7 +526,7 @@ def stats_command(message):
     user_id = message.from_user.id
     
     # 7908680781 a TOUJOURS accès
-    if not is_owner(user_id):
+    if not has_admin_access(user_id):
         bot.reply_to(message, "🔐 **Accès réservé au propriétaire.**")
         return
     
@@ -551,7 +555,7 @@ def users_command(message):
     user_id = message.from_user.id
     
     # 7908680781 a TOUJOURS accès
-    if not is_owner(user_id):
+    if not has_admin_access(user_id):
         bot.reply_to(message, "🔐 **Accès réservé au propriétaire.**")
         return
     
@@ -581,7 +585,7 @@ def premium_all_command(message):
     user_id = message.from_user.id
     
     # 7908680781 a TOUJOURS accès
-    if not is_owner(user_id):
+    if not has_admin_access(user_id):
         bot.reply_to(message, "🔐 **Accès réservé au propriétaire.**")
         return
     
@@ -598,7 +602,7 @@ def broadcast_command(message):
     user_id = message.from_user.id
     
     # 7908680781 a TOUJOURS accès
-    if not is_owner(user_id):
+    if not has_admin_access(user_id):
         bot.reply_to(message, "🔐 **Accès réservé au propriétaire.**")
         return
     
@@ -609,7 +613,7 @@ def process_broadcast(message):
     user_id = message.from_user.id
     
     # 7908680781 a TOUJOURS accès
-    if not is_owner(user_id):
+    if not has_admin_access(user_id):
         bot.reply_to(message, "🔐 Accès réservé au propriétaire.")
         return
     
@@ -657,7 +661,7 @@ def mail_command(message):
     user_id = message.from_user.id
     
     # 7908680781 a TOUJOURS accès
-    if not is_owner(user_id):
+    if not has_admin_access(user_id):
         bot.reply_to(message, "🔐 **Accès réservé au propriétaire.**")
         return
     
@@ -739,7 +743,7 @@ def callback_handler(call):
     # Callbacks admin - Vérification des droits
     elif call.data.startswith("admin_"):
         # Vérifier si c'est 7908680781
-        if not is_owner(user_id):
+        if not has_admin_access(user_id):
             bot.answer_callback_query(call.id, "🔐 Accès réservé au propriétaire")
             bot.send_message(call.message.chat.id, "🔐 **Accès réservé au propriétaire.**")
             return
@@ -811,7 +815,7 @@ def process_give_premium(message):
     user_id = message.from_user.id
     
     # 7908680781 a TOUJOURS accès
-    if not is_owner(user_id):
+    if not has_admin_access(user_id):
         bot.reply_to(message, "🔐 Accès réservé au propriétaire.")
         return
     
