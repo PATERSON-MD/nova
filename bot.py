@@ -104,10 +104,6 @@ def is_owner(user_id):
     """Vérifie si l'utilisateur est le propriétaire 7908680781"""
     return user_id == ADMIN_ID
 
-def has_admin_access(user_id):
-    """Vérifie si l'utilisateur a accès aux fonctions admin"""
-    return is_owner(user_id)
-
 # ==================== FONCTIONS UTILISATEURS ====================
 def get_progress_bar():
     total = get_group_stats()
@@ -236,6 +232,103 @@ def send_legendary_photo(chat_id, caption, reply_markup=None):
         )
         return False
 
+# ==================== FONCTIONS ADMIN DIRECTES ====================
+def show_stats(user_id):
+    """Affiche les statistiques directement"""
+    total_users = len(get_all_users())
+    premium_users = len([u for u in get_all_users() if u[3]])
+    groups_count = get_group_stats()
+    
+    stats_text = f"""
+📊 **STATISTIQUES LÉGENDAIRES**
+
+👥 **Utilisateurs :** {total_users}
+⭐ **Premium :** {premium_users}
+🔒 **Standard :** {total_users - premium_users}
+📁 **Groupes :** {groups_count}/5
+🕐 **MAJ :** {datetime.now().strftime('%H:%M %d/%m/%Y')}
+
+👑 **Propriétaire :** 7908680781
+"""
+    send_legendary_photo(user_id, stats_text)
+
+def show_users(user_id):
+    """Affiche la liste des utilisateurs directement"""
+    users = get_all_users()
+    if not users:
+        bot.send_message(user_id, "📭 Aucun utilisateur enregistré.")
+        return
+    
+    response = "👥 **LISTE DES UTILISATEURS**\n\n"
+    for i, user in enumerate(users[:15], 1):
+        user_id, username, first_name, has_premium, added_date = user
+        premium_status = "⭐" if has_premium else "🔒"
+        username_display = f"@{username}" if username else "❌ Sans username"
+        response += f"{i}. {premium_status} **{first_name}**\n"
+        response += f"   👤 {username_display}\n"
+        response += f"   🆔 `{user_id}`\n"
+        response += "━━━━━━━━━━━━━━━━━━━━\n"
+    
+    if len(users) > 15:
+        response += f"\n... et {len(users) - 15} autres"
+    
+    send_legendary_photo(user_id, response)
+
+def start_broadcast(user_id):
+    """Démarre un broadcast directement"""
+    msg = bot.send_message(user_id, "📢 **BROADCAST LÉGENDAIRE**\n\n💎 Envoyez le message à diffuser à tous les utilisateurs :")
+    bot.register_next_step_handler(msg, process_broadcast)
+
+def process_broadcast(message):
+    user_id = message.from_user.id
+    
+    broadcast_text = message.text
+    users = get_all_users()
+    total_users = len(users)
+    
+    progress_msg = bot.send_message(message.chat.id, f"📤 **Lancement du broadcast...**\n0/{total_users} utilisateurs")
+    
+    success_count = 0
+    fail_count = 0
+    
+    for i, user in enumerate(users):
+        try:
+            bot.send_message(user[0], f"📢 **Message de l'admin**\n\n{broadcast_text}")
+            success_count += 1
+        except:
+            fail_count += 1
+        
+        if i % 10 == 0:
+            try:
+                bot.edit_message_text(
+                    f"📤 **Propagation en cours...**\n{i+1}/{total_users} utilisateurs",
+                    message.chat.id,
+                    progress_msg.message_id
+                )
+            except:
+                pass
+        
+        time.sleep(0.1)
+    
+    result_text = f"""
+✅ **BROADCAST TERMINÉ !**
+
+📊 **Résultats :**
+• ✅ Messages délivrés : {success_count}
+• ❌ Échecs : {fail_count}
+• 📝 Total : {total_users}
+"""
+    send_legendary_photo(message.chat.id, result_text)
+
+def give_premium_to_all(user_id):
+    """Donne le premium à tous les utilisateurs"""
+    users = get_all_users()
+    for user in users:
+        activate_user_premium(user[0])
+    
+    response = f"⚡ **PREMIUM LÉGENDAIRE ACTIVÉ !**\n\n⭐ **Premium activé pour tous les {len(users)} utilisateurs !**"
+    send_legendary_photo(user_id, response)
+
 # ==================== HANDLERS UTILISATEURS ====================
 @bot.message_handler(commands=['start', 'aide', 'help'])
 def start_handler(message):
@@ -346,27 +439,12 @@ def stats_command(message):
     """Statistiques du bot"""
     user_id = message.from_user.id
     
-    # Vérifier les droits admin - SEUL 7908680781
+    # Vérifier si c'est le propriétaire
     if not is_owner(user_id):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nContactez l'administrateur.")
         return
     
-    total_users = len(get_all_users())
-    premium_users = len([u for u in get_all_users() if u[3]])
-    groups_count = get_group_stats()
-    
-    stats_text = f"""
-📊 **STATISTIQUES LÉGENDAIRES**
-
-👥 **Utilisateurs :** {total_users}
-⭐ **Premium :** {premium_users}
-🔒 **Standard :** {total_users - premium_users}
-📁 **Groupes :** {groups_count}/5
-🕐 **MAJ :** {datetime.now().strftime('%H:%M %d/%m/%Y')}
-
-👑 **Propriétaire :** 7908680781
-"""
-    send_legendary_photo(message.chat.id, stats_text)
+    show_stats(user_id)
 
 @bot.message_handler(commands=['users'])
 def users_command(message):
@@ -377,25 +455,7 @@ def users_command(message):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nContactez l'administrateur.")
         return
     
-    users = get_all_users()
-    if not users:
-        bot.reply_to(message, "📭 Aucun utilisateur enregistré.")
-        return
-    
-    response = "👥 **LISTE DES UTILISATEURS**\n\n"
-    for i, user in enumerate(users[:15], 1):
-        user_id, username, first_name, has_premium, added_date = user
-        premium_status = "⭐" if has_premium else "🔒"
-        username_display = f"@{username}" if username else "❌ Sans username"
-        response += f"{i}. {premium_status} **{first_name}**\n"
-        response += f"   👤 {username_display}\n"
-        response += f"   🆔 `{user_id}`\n"
-        response += "━━━━━━━━━━━━━━━━━━━━\n"
-    
-    if len(users) > 15:
-        response += f"\n... et {len(users) - 15} autres"
-    
-    send_legendary_photo(message.chat.id, response)
+    show_users(user_id)
 
 @bot.message_handler(commands=['premium_all'])
 def premium_all_command(message):
@@ -406,12 +466,7 @@ def premium_all_command(message):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nContactez l'administrateur.")
         return
     
-    users = get_all_users()
-    for user in users:
-        activate_user_premium(user[0])
-    
-    response = f"⚡ **PREMIUM LÉGENDAIRE ACTIVÉ !**\n\n⭐ **Premium activé pour tous les {len(users)} utilisateurs !**"
-    send_legendary_photo(message.chat.id, response)
+    give_premium_to_all(user_id)
 
 @bot.message_handler(commands=['broadcast'])
 def broadcast_command(message):
@@ -422,53 +477,7 @@ def broadcast_command(message):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nContactez l'administrateur.")
         return
     
-    msg = bot.reply_to(message, "📢 **BROADCAST LÉGENDAIRE**\n\n💎 Envoyez le message à diffuser à tous les utilisateurs :")
-    bot.register_next_step_handler(msg, process_broadcast)
-
-def process_broadcast(message):
-    user_id = message.from_user.id
-    
-    if not is_owner(user_id):
-        bot.reply_to(message, "🔐 Accès refusé.")
-        return
-    
-    broadcast_text = message.text
-    users = get_all_users()
-    total_users = len(users)
-    
-    progress_msg = bot.send_message(message.chat.id, f"📤 **Lancement du broadcast...**\n0/{total_users} utilisateurs")
-    
-    success_count = 0
-    fail_count = 0
-    
-    for i, user in enumerate(users):
-        try:
-            bot.send_message(user[0], f"📢 **Message de l'admin**\n\n{broadcast_text}")
-            success_count += 1
-        except:
-            fail_count += 1
-        
-        if i % 10 == 0:
-            try:
-                bot.edit_message_text(
-                    f"📤 **Propagation en cours...**\n{i+1}/{total_users} utilisateurs",
-                    message.chat.id,
-                    progress_msg.message_id
-                )
-            except:
-                pass
-        
-        time.sleep(0.1)
-    
-    result_text = f"""
-✅ **BROADCAST TERMINÉ !**
-
-📊 **Résultats :**
-• ✅ Messages délivrés : {success_count}
-• ❌ Échecs : {fail_count}
-• 📝 Total : {total_users}
-"""
-    send_legendary_photo(message.chat.id, result_text)
+    start_broadcast(user_id)
 
 # ==================== GESTION DES CALLBACKS ====================
 @bot.callback_query_handler(func=lambda call: True)
@@ -510,13 +519,13 @@ def callback_handler(call):
             bot.send_message(call.message.chat.id, "🔐 **Accès refusé.**\n\nContactez l'administrateur.")
             return
         
-        # Exécuter la commande admin
+        # Exécuter la commande admin DIRECTEMENT
         if call.data == "admin_stats":
-            stats_command(call.message)
+            show_stats(user_id)
             bot.answer_callback_query(call.id, "📊 Statistiques")
         
         elif call.data == "admin_users":
-            users_command(call.message)
+            show_users(user_id)
             bot.answer_callback_query(call.id, "👥 Utilisateurs")
         
         elif call.data == "admin_premium":
@@ -533,7 +542,7 @@ def callback_handler(call):
             bot.answer_callback_query(call.id, "🎁 Donner Premium")
         
         elif call.data == "admin_broadcast":
-            broadcast_command(call.message)
+            start_broadcast(user_id)
             bot.answer_callback_query(call.id, "📢 Broadcast")
         
         elif call.data == "admin_mail":
@@ -562,7 +571,7 @@ def callback_handler(call):
             bot.answer_callback_query(call.id, "⚡ Avancé")
         
         elif call.data == "admin_premium_all":
-            premium_all_command(call.message)
+            give_premium_to_all(user_id)
             bot.answer_callback_query(call.id, "⚡ Premium à Tous")
         
         elif call.data == "admin_cleanup":
@@ -606,10 +615,6 @@ def get_user_session(user_id):
     if user_id not in user_sessions:
         user_sessions[user_id] = {'conversation': []}
     return user_sessions[user_id]
-
-def get_premium_users():
-    users = get_all_users()
-    return [user for user in users if user[3]]
 
 @bot.message_handler(func=lambda message: True)
 def message_handler(message):
