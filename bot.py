@@ -6,7 +6,7 @@ import random
 import re
 import time
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
@@ -27,6 +27,9 @@ current_model = "llama-3.1-8b-instant"
 # 🔐 ADMIN - 7908680781 EST LE PROPRIÉTAIRE PERMANENT
 ADMIN_ID = 7908680781
 
+# LIEN AFFILIÉ UNIQUE DU BOT
+AFFILIATE_LINK = "https://t.me/Kervensbug_bot"
+
 # Stockage
 user_sessions = {}
 
@@ -36,21 +39,31 @@ def init_db():
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     
-    # Table des groupes
-    c.execute('''CREATE TABLE IF NOT EXISTS groups
-                 (group_id INTEGER PRIMARY KEY, 
-                  group_name TEXT,
-                  member_count INTEGER,
-                  added_date TIMESTAMP)''')
-    
-    # Table des utilisateurs
+    # Table des utilisateurs avec système de parrainage
     c.execute('''CREATE TABLE IF NOT EXISTS user_access
                  (user_id INTEGER PRIMARY KEY,
                   username TEXT,
                   first_name TEXT,
                   has_premium BOOLEAN DEFAULT FALSE,
                   premium_since TIMESTAMP,
-                  added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+                  referrals_count INTEGER DEFAULT 0,
+                  added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
+    # Table des parrainages
+    c.execute('''CREATE TABLE IF NOT EXISTS referrals
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  referrer_id INTEGER,
+                  referred_user_id INTEGER,
+                  referral_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
+    # Table des statistiques d'usage
+    c.execute('''CREATE TABLE IF NOT EXISTS user_activity
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  user_id INTEGER,
+                  activity_date DATE DEFAULT CURRENT_DATE,
+                  message_count INTEGER DEFAULT 1,
+                  UNIQUE(user_id, activity_date))''')
     
     conn.commit()
     conn.close()
@@ -76,28 +89,122 @@ def activate_user_premium(user_id):
 def get_all_users():
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
-    c.execute('SELECT user_id, username, first_name, has_premium, added_date FROM user_access')
+    c.execute('SELECT user_id, username, first_name, has_premium, referrals_count, added_date FROM user_access')
     users = c.fetchall()
     conn.close()
     return users
 
-def get_group_stats():
+def get_user_referrals_count(user_id):
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
-    c.execute('SELECT COUNT(*) FROM groups')
-    total = c.fetchone()[0]
+    c.execute('SELECT referrals_count FROM user_access WHERE user_id = ?', (user_id,))
+    result = c.fetchone()
     conn.close()
-    return total
+    return result[0] if result else 0
 
-def register_user(user_id, username, first_name):
+def increment_referral_count(user_id):
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
-    c.execute('''INSERT OR REPLACE INTO user_access 
-                 (user_id, username, first_name, added_date) 
-                 VALUES (?, ?, ?, ?)''', 
-                 (user_id, username, first_name, datetime.now()))
+    c.execute('UPDATE user_access SET referrals_count = referrals_count + 1 WHERE user_id = ?', (user_id,))
     conn.commit()
     conn.close()
+
+def register_user(user_id, username, first_name, referrer_id=None):
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    
+    # Enregistrer l'utilisateur
+    c.execute('''INSERT OR REPLACE INTO user_access 
+                 (user_id, username, first_name, added_date, last_activity) 
+                 VALUES (?, ?, ?, ?, ?)''', 
+                 (user_id, username, first_name, datetime.now(), datetime.now()))
+    
+    # Enregistrer le parrainage si applicable
+    if referrer_id:
+        c.execute('INSERT INTO referrals (referrer_id, referred_user_id) VALUES (?, ?)', 
+                 (referrer_id, user_id))
+        increment_referral_count(referrer_id)
+    
+    conn.commit()
+    conn.close()
+
+def update_user_activity(user_id):
+    """Met à jour l'activité de l'utilisateur"""
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    
+    # Mettre à jour last_activity dans user_access
+    c.execute('UPDATE user_access SET last_activity = ? WHERE user_id = ?', 
+              (datetime.now(), user_id))
+    
+    # Incrémenter le compteur de messages pour aujourd'hui
+    c.execute('''INSERT INTO user_activity (user_id, message_count) 
+                 VALUES (?, 1)
+                 ON CONFLICT(user_id, activity_date) 
+                 DO UPDATE SET message_count = message_count + 1''', 
+                 (user_id,))
+    
+    conn.commit()
+    conn.close()
+
+def get_monthly_users():
+    """Compte les utilisateurs actifs du mois en cours (RÉEL)"""
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    
+    # Utilisateurs uniques qui ont eu une activité ce mois-ci
+    first_day_of_month = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    c.execute('''SELECT COUNT(DISTINCT user_id) FROM user_activity 
+                 WHERE activity_date >= ?''', (first_day_of_month,))
+    
+    result = c.fetchone()
+    conn.close()
+    
+    return result[0] if result else 0
+
+def get_total_users():
+    """Compte le nombre total d'utilisateurs enregistrés"""
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    c.execute('SELECT COUNT(*) FROM user_access')
+    result = c.fetchone()
+    conn.close()
+    return result[0] if result else 0
+
+def get_active_users_last_30_days():
+    """Compte les utilisateurs actifs dans les 30 derniers jours"""
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    
+    thirty_days_ago = datetime.now() - timedelta(days=30)
+    
+    c.execute('''SELECT COUNT(DISTINCT user_id) FROM user_activity 
+                 WHERE activity_date >= ?''', (thirty_days_ago,))
+    
+    result = c.fetchone()
+    conn.close()
+    
+    return result[0] if result else 0
+
+def get_daily_stats():
+    """Statistiques d'usage du jour"""
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    
+    today = datetime.now().date()
+    
+    # Messages aujourd'hui
+    c.execute('SELECT SUM(message_count) FROM user_activity WHERE activity_date = ?', (today,))
+    today_messages = c.fetchone()[0] or 0
+    
+    # Utilisateurs actifs aujourd'hui
+    c.execute('SELECT COUNT(DISTINCT user_id) FROM user_activity WHERE activity_date = ?', (today,))
+    today_users = c.fetchone()[0] or 0
+    
+    conn.close()
+    
+    return today_users, today_messages
 
 # ==================== FONCTIONS ADMIN ====================
 def is_owner(user_id):
@@ -105,11 +212,18 @@ def is_owner(user_id):
     return user_id == ADMIN_ID
 
 # ==================== FONCTIONS UTILISATEURS ====================
-def get_progress_bar():
-    total = get_group_stats()
-    filled = '█' * min(total, 5)
-    empty = '░' * (5 - min(total, 5))
-    return f"`[{filled}{empty}]` {total}/5"
+def get_progress_bar(referrals_count):
+    filled = '█' * min(referrals_count, 5)
+    empty = '░' * (5 - min(referrals_count, 5))
+    return f"`[{filled}{empty}]` {referrals_count}/5"
+
+def get_header_stats():
+    """Retourne les statistiques pour l'en-tête"""
+    monthly_users = get_monthly_users()
+    total_users = get_total_users()
+    today_users, today_messages = get_daily_stats()
+    
+    return f"👥 {monthly_users} utilisateurs mensuels • 📊 {total_users} total • 🔥 {today_users} actifs aujourd'hui"
 
 def create_main_menu():
     keyboard = InlineKeyboardMarkup()
@@ -118,23 +232,20 @@ def create_main_menu():
     return keyboard
 
 def create_premium_menu(user_id=None):
-    """Menu premium"""
+    """Menu premium avec lien de parrainage"""
     keyboard = InlineKeyboardMarkup()
     
-    try:
-        bot_user = bot.get_me()
-        bot_username = bot_user.username
-        add_button = InlineKeyboardButton(
-            "📥 Ajouter à un groupe", 
-            url=f"https://t.me/{bot_username}?startgroup=true"
-        )
-    except:
-        add_button = InlineKeyboardButton("📥 Ajouter à un groupe", url="https://t.me/")
+    # Bouton pour partager le lien affilié
+    share_button = InlineKeyboardButton("📤 Partager le Lien", url=f"https://t.me/share/url?url={AFFILIATE_LINK}?start={user_id}&text=🚀 Découvrez KervensAI Pro - L'IA la plus puissante sur Telegram !")
+    
+    # Bouton pour copier le lien
+    copy_button = InlineKeyboardButton("📋 Copier le Lien", callback_data="copy_link")
     
     status_button = InlineKeyboardButton("📊 Vérifier le statut", callback_data="check_status")
     premium_button = InlineKeyboardButton("🎁 Activer Premium", callback_data="activate_premium")
     
-    keyboard.add(add_button)
+    keyboard.add(share_button)
+    keyboard.add(copy_button)
     keyboard.add(status_button)
     keyboard.add(premium_button)
     
@@ -234,18 +345,27 @@ def send_legendary_photo(chat_id, caption, reply_markup=None):
 
 # ==================== FONCTIONS ADMIN DIRECTES ====================
 def show_stats(user_id):
-    """Affiche les statistiques directement"""
-    total_users = len(get_all_users())
+    """Affiche les statistiques RÉELLES"""
+    total_users = get_total_users()
     premium_users = len([u for u in get_all_users() if u[3]])
-    groups_count = get_group_stats()
+    monthly_users = get_monthly_users()
+    active_30_days = get_active_users_last_30_days()
+    today_users, today_messages = get_daily_stats()
+    total_referrals = sum([u[4] for u in get_all_users()])
     
     stats_text = f"""
-📊 **STATISTIQUES LÉGENDAIRES**
+📊 **STATISTIQUES RÉELLES - {BOT_NAME}**
 
-👥 **Utilisateurs :** {total_users}
-⭐ **Premium :** {premium_users}
-🔒 **Standard :** {total_users - premium_users}
-📁 **Groupes :** {groups_count}/5
+👥 **Utilisateurs Totaux :** {total_users}
+⭐ **Utilisateurs Premium :** {premium_users}
+📈 **Utilisateurs Mensuels :** {monthly_users}
+🔥 **Actifs (30j) :** {active_30_days}
+
+📅 **Aujourd'hui :**
+• 👤 Utilisateurs actifs: {today_users}
+• 💬 Messages envoyés: {today_messages}
+
+📤 **Parrainages Totaux :** {total_referrals}
 🕐 **MAJ :** {datetime.now().strftime('%H:%M %d/%m/%Y')}
 
 👑 **Propriétaire :** 7908680781
@@ -261,12 +381,13 @@ def show_users(user_id):
     
     response = "👥 **LISTE DES UTILISATEURS**\n\n"
     for i, user in enumerate(users[:15], 1):
-        user_id, username, first_name, has_premium, added_date = user
+        user_id, username, first_name, has_premium, referrals_count, added_date = user
         premium_status = "⭐" if has_premium else "🔒"
         username_display = f"@{username}" if username else "❌ Sans username"
         response += f"{i}. {premium_status} **{first_name}**\n"
         response += f"   👤 {username_display}\n"
         response += f"   🆔 `{user_id}`\n"
+        response += f"   📊 Parrainages: {referrals_count}\n"
         response += "━━━━━━━━━━━━━━━━━━━━\n"
     
     if len(users) > 15:
@@ -330,20 +451,32 @@ def give_premium_to_all(user_id):
     send_legendary_photo(user_id, response)
 
 # ==================== HANDLERS UTILISATEURS ====================
-@bot.message_handler(commands=['start', 'aide', 'help'])
+@bot.message_handler(commands=['start'])
 def start_handler(message):
     try:
         user_id = message.from_user.id
         username = message.from_user.username or "Utilisateur"
         first_name = message.from_user.first_name or "Utilisateur"
         
-        register_user(user_id, username, first_name)
+        # Vérifier s'il y a un paramètre de parrainage
+        referrer_id = None
+        if len(message.text.split()) > 1:
+            try:
+                referrer_id = int(message.text.split()[1])
+            except:
+                pass
+        
+        register_user(user_id, username, first_name, referrer_id)
+        update_user_activity(user_id)  # Mettre à jour l'activité
         
         # Vérifier si c'est le propriétaire 7908680781
         if is_owner(user_id):
             activate_user_premium(user_id)  # Premium automatique
             
+            header_stats = get_header_stats()
             caption = f"""
+{header_stats}
+
 👑 **{BOT_NAME} - {VERSION}**
 
 💎 **BIENVENUE PROPRIÉTAIRE !**
@@ -363,17 +496,23 @@ def start_handler(message):
             send_legendary_photo(message.chat.id, caption, create_owner_menu())
             return
         
-        # Photo du créateur pour les utilisateurs normaux
+        # Photo du créateur pour les utilisateurs normaux avec stats en haut
+        header_stats = get_header_stats()
         send_legendary_photo(
             message.chat.id,
-            f"📸 **{CREATOR}** - Créateur du bot\n*Votre expert en IA* 👑",
+            f"{header_stats}\n\n📸 **{CREATOR}** - Créateur du bot\n*Votre expert en IA* 👑",
             create_main_menu() if check_premium_access(user_id) else create_premium_menu(user_id)
         )
         
         time.sleep(0.5)
         
+        referrals_count = get_user_referrals_count(user_id)
+        monthly_users = get_monthly_users()  # Statistique réelle
+        
         if check_premium_access(user_id):
             menu = f"""
+{header_stats}
+
 🎉 **{BOT_NAME}** - {VERSION} **PREMIUM**
 
 ⭐ **Version Premium Activée !**
@@ -389,16 +528,16 @@ def start_handler(message):
 """
             bot.send_message(message.chat.id, menu, parse_mode='Markdown', reply_markup=create_main_menu())
         else:
-            total = get_group_stats()
-            
-            if total >= 5:
+            if referrals_count >= 5:
                 menu = f"""
+{header_stats}
+
 🎊 **{BOT_NAME}** - PRÊT POUR LE PREMIUM !
 
-{get_progress_bar()}
+{get_progress_bar(referrals_count)}
 
 ✅ **Conditions remplies !** 
-5/5 groupes atteints !
+5/5 parrainages atteints !
 
 🎁 **Cliquez sur "Activer Premium" ci-dessous**
 pour débloquer toutes les fonctionnalités !
@@ -407,24 +546,29 @@ pour débloquer toutes les fonctionnalités !
 """
             else:
                 menu = f"""
+{header_stats}
+
 🔒 **{BOT_NAME}** - {VERSION} **LIMITÉE**
 
 🚀 **Assistant IA optimisé pour Groq**
 *Version limitée - Débloquez le premium gratuitement !*
 
-{get_progress_bar()}
+{get_progress_bar(referrals_count)}
 
 🎁 **Conditions pour le Premium GRATUIT :**
-• ➕ Bot dans 5 groupes
+• 📤 Partager ton lien affilié unique avec 5 personnes
 • ✅ Déblocage immédiat après validation
 
-📊 **Statut actuel :**
-• Groupes : {total}/5
+📈 **Statut actuel :**
+• Parrainages : {referrals_count}/5
 
 💡 **Comment débloquer :**
-1. Cliquez sur "Ajouter à un groupe" ci-dessous
-2. Choisissez n'importe quel groupe
-3. Le premium se débloque à 5 groupes
+1. Cliquez sur "Partager le Lien" ci-dessous
+2. Partage avec tes amis
+3. Le premium se débloque à 5 parrainages
+
+🔗 **Ton lien affilié unique :**
+`{AFFILIATE_LINK}?start={user_id}`
 """
             
             bot.send_message(message.chat.id, menu, parse_mode='Markdown', reply_markup=create_premium_menu(user_id))
@@ -432,6 +576,33 @@ pour débloquer toutes les fonctionnalités !
     except Exception as e:
         print(f"❌ Erreur start: {e}")
         bot.reply_to(message, "❌ Erreur temporaire. Réessayez.")
+
+@bot.message_handler(commands=['aide', 'help'])
+def help_handler(message):
+    """Aide pour les utilisateurs"""
+    user_id = message.from_user.id
+    referrals_count = get_user_referrals_count(user_id)
+    header_stats = get_header_stats()
+    
+    help_text = f"""
+{header_stats}
+
+🆘 **AIDE - {BOT_NAME}**
+
+🎯 **Comment obtenir le PREMIUM GRATUIT :**
+1. 📤 Partage ton lien affilié avec tes amis
+2. 👥 5 personnes doivent cliquer sur ton lien
+3. ⭐ Le premium se débloque automatiquement
+
+📊 **Ton progrès :**
+{get_progress_bar(referrals_count)}
+
+🔗 **Ton lien affilié unique :**
+`{AFFILIATE_LINK}?start={user_id}`
+
+💡 **Astuce :** Partage le lien dans tes groupes et avec tes amis pour débloquer rapidement le premium !
+"""
+    bot.send_message(message.chat.id, help_text, parse_mode='Markdown', reply_markup=create_premium_menu(user_id))
 
 # ==================== COMMANDES ADMIN ====================
 @bot.message_handler(commands=['stats'])
@@ -486,30 +657,38 @@ def callback_handler(call):
     
     # Callbacks utilisateurs normaux
     if call.data == "check_status":
-        total = get_group_stats()
+        referrals_count = get_user_referrals_count(user_id)
         if check_premium_access(user_id):
             bot.answer_callback_query(call.id, "✅ Premium activé !")
         else:
-            bot.answer_callback_query(call.id, f"📊 {total}/5 groupes - {5-total} manquant(s)")
+            bot.answer_callback_query(call.id, f"📊 {referrals_count}/5 parrainages - {5-referrals_count} manquant(s)")
     
     elif call.data == "activate_premium":
-        total = get_group_stats()
-        if total >= 5:
+        referrals_count = get_user_referrals_count(user_id)
+        if referrals_count >= 5:
             activate_user_premium(user_id)
             bot.answer_callback_query(call.id, "🎉 Premium activé !")
             
             try:
+                header_stats = get_header_stats()
                 bot.edit_message_text(
                     chat_id=call.message.chat.id,
                     message_id=call.message.message_id,
-                    text="🎉 **Premium activé avec succès !**\n\n✨ **Profitez de toutes les fonctionnalités IA !**\n💬 Envoyez-moi un message pour commencer !",
+                    text=f"{header_stats}\n\n🎉 **Premium activé avec succès !**\n\n✨ **Profitez de toutes les fonctionnalités IA !**\n💬 Envoyez-moi un message pour commencer !",
                     parse_mode='Markdown',
                     reply_markup=create_main_menu()
                 )
             except:
-                bot.send_message(call.message.chat.id, "🎉 **Premium activé avec succès !**\n\n✨ Profitez de l'IA !")
+                header_stats = get_header_stats()
+                bot.send_message(call.message.chat.id, f"{header_stats}\n\n🎉 **Premium activé avec succès !**\n\n✨ Profitez de l'IA !")
         else:
-            bot.answer_callback_query(call.id, f"❌ {5-total} groupe(s) manquant(s)")
+            bot.answer_callback_query(call.id, f"❌ {5-referrals_count} parrainage(s) manquant(s)")
+    
+    elif call.data == "copy_link":
+        bot.answer_callback_query(call.id, "📋 Lien copié dans le presse-papier !")
+        header_stats = get_header_stats()
+        bot.send_message(call.message.chat.id, 
+                        f"{header_stats}\n\n🔗 **Ton lien affilié unique :**\n\n`{AFFILIATE_LINK}?start={user_id}`\n\n📤 **Copie et partage ce lien avec tes amis !**")
     
     # Callbacks admin - Vérification des droits
     elif call.data.startswith("admin_"):
@@ -529,15 +708,17 @@ def callback_handler(call):
             bot.answer_callback_query(call.id, "👥 Utilisateurs")
         
         elif call.data == "admin_premium":
+            header_stats = get_header_stats()
             send_legendary_photo(
                 call.message.chat.id,
-                "⭐ **GESTION PREMIUM**\n\nChoisissez une action :",
+                f"{header_stats}\n\n⭐ **GESTION PREMIUM**\n\nChoisissez une action :",
                 create_premium_management_menu()
             )
             bot.answer_callback_query(call.id, "⭐ Gestion Premium")
         
         elif call.data == "admin_give_premium":
-            msg = bot.send_message(call.message.chat.id, "🎁 **DONNER LE PREMIUM**\n\nEnvoyez l'ID de l'utilisateur :")
+            header_stats = get_header_stats()
+            msg = bot.send_message(call.message.chat.id, f"{header_stats}\n\n🎁 **DONNER LE PREMIUM**\n\nEnvoyez l'ID de l'utilisateur :")
             bot.register_next_step_handler(msg, process_give_premium)
             bot.answer_callback_query(call.id, "🎁 Donner Premium")
         
@@ -548,24 +729,28 @@ def callback_handler(call):
         elif call.data == "admin_mail":
             # Simuler la commande mail
             users = get_all_users()
-            response = f"📨 **MESSAGES REÇUS**\n\n📊 Total utilisateurs: {len(users)}\n💡 Fonctionnalité à venir..."
+            header_stats = get_header_stats()
+            response = f"{header_stats}\n\n📨 **MESSAGES REÇUS**\n\n📊 Total utilisateurs: {len(users)}\n💡 Fonctionnalité à venir..."
             send_legendary_photo(call.message.chat.id, response)
             bot.answer_callback_query(call.id, "📨 Messages")
         
         elif call.data == "admin_logs":
-            response = "📋 **LOGS ADMIN**\n\n🕐 Dernière activité: Maintenant\n👤 Admin connecté: Vous\n💡 Système opérationnel"
+            header_stats = get_header_stats()
+            response = f"{header_stats}\n\n📋 **LOGS ADMIN**\n\n🕐 Dernière activité: Maintenant\n👤 Admin connecté: Vous\n💡 Système opérationnel"
             send_legendary_photo(call.message.chat.id, response)
             bot.answer_callback_query(call.id, "📋 Logs")
         
         elif call.data == "admin_system":
-            response = "🖥️ **SYSTÈME**\n\n💾 Mémoire: OK\n⚡ CPU: Optimal\n🔗 Connexion: Stable\n🤖 Bot: Actif"
+            header_stats = get_header_stats()
+            response = f"{header_stats}\n\n🖥️ **SYSTÈME**\n\n💾 Mémoire: OK\n⚡ CPU: Optimal\n🔗 Connexion: Stable\n🤖 Bot: Actif"
             send_legendary_photo(call.message.chat.id, response)
             bot.answer_callback_query(call.id, "🖥️ Système")
         
         elif call.data == "admin_advanced":
+            header_stats = get_header_stats()
             send_legendary_photo(
                 call.message.chat.id,
-                "⚡ **OUTILS AVANCÉS**\n\nChoisissez un outil :",
+                f"{header_stats}\n\n⚡ **OUTILS AVANCÉS**\n\nChoisissez un outil :",
                 create_advanced_admin_menu()
             )
             bot.answer_callback_query(call.id, "⚡ Avancé")
@@ -575,14 +760,16 @@ def callback_handler(call):
             bot.answer_callback_query(call.id, "⚡ Premium à Tous")
         
         elif call.data == "admin_cleanup":
-            response = "🧹 **NETTOYAGE EFFECTUÉ**\n\n✅ Base de données optimisée\n🗑️ Cache nettoyé\n⚡ Performances améliorées"
+            header_stats = get_header_stats()
+            response = f"{header_stats}\n\n🧹 **NETTOYAGE EFFECTUÉ**\n\n✅ Base de données optimisée\n🗑️ Cache nettoyé\n⚡ Performances améliorées"
             send_legendary_photo(call.message.chat.id, response)
             bot.answer_callback_query(call.id, "🧹 Nettoyage")
         
         elif call.data == "admin_back":
+            header_stats = get_header_stats()
             send_legendary_photo(
                 call.message.chat.id,
-                "👑 **PANEL DE CONTRÔLE**\n\nRetour au menu principal :",
+                f"{header_stats}\n\n👑 **PANEL DE CONTRÔLE**\n\nRetour au menu principal :",
                 create_owner_menu()
             )
             bot.answer_callback_query(call.id, "🔙 Retour")
@@ -604,7 +791,8 @@ def process_give_premium(message):
         except:
             pass
         
-        response = f"✅ **PREMIUM ACCORDÉ !**\n\n⭐ **Premium activé pour l'utilisateur {target_user_id}**"
+        header_stats = get_header_stats()
+        response = f"{header_stats}\n\n✅ **PREMIUM ACCORDÉ !**\n\n⭐ **Premium activé pour l'utilisateur {target_user_id}**"
         send_legendary_photo(message.chat.id, response)
         
     except ValueError:
@@ -624,15 +812,19 @@ def message_handler(message):
         
     user_id = message.from_user.id
     
+    # Mettre à jour l'activité de l'utilisateur (RÉEL)
+    update_user_activity(user_id)
+    
     if not check_premium_access(user_id):
-        total = get_group_stats()
-        if total >= 5:
+        referrals_count = get_user_referrals_count(user_id)
+        header_stats = get_header_stats()
+        if referrals_count >= 5:
             bot.reply_to(message, 
-                       "🎊 **PRÊT POUR LE PREMIUM !**\n\n✅ 5/5 groupes atteints !\n\n🎁 Cliquez sur 'Activer Premium' pour débloquer l'IA !",
+                       f"{header_stats}\n\n🎊 **PRÊT POUR LE PREMIUM !**\n\n✅ 5/5 parrainages atteints !\n\n🎁 Cliquez sur 'Activer Premium' pour débloquer l'IA !",
                        reply_markup=create_premium_menu(user_id))
         else:
             bot.reply_to(message, 
-                       f"🔒 **Version limitée**\n\n{get_progress_bar()}\n\nAjoutez le bot à {5-total} groupe(s) pour débloquer l'IA.",
+                       f"{header_stats}\n\n🔒 **Version limitée**\n\n{get_progress_bar(referrals_count)}\n\nPartage ton lien avec {5-referrals_count} personne(s) pour débloquer l'IA.",
                        reply_markup=create_premium_menu(user_id))
         return
     
@@ -686,10 +878,11 @@ if __name__ == "__main__":
     print("✅ Base prête")
     print(f"🚀 {BOT_NAME} - {VERSION}")
     print(f"👑 Créateur: {CREATOR}")
-    print("💎 SYSTÈME SANS AUTHENTIFICATION")
+    print("💎 STATISTIQUES EN TEMPS RÉEL ACTIVÉES")
     print(f"   👑 Propriétaire: {ADMIN_ID}")
-    print("   🔓 Accès admin automatique pour 7908680781")
-    print("   🚫 Pas d'authentification requise")
+    print(f"   🔗 Lien affilié: {AFFILIATE_LINK}")
+    print("   📊 Stats affichées en haut de chaque message")
+    print("   📤 5 parrainages = Premium gratuit")
     print("🤖 En attente de messages...")
     
     try:
