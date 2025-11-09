@@ -29,7 +29,6 @@ ADMIN_ID = 7908680781
 
 # Stockage
 user_sessions = {}
-admin_sessions = {}
 
 # ==================== BASE DE DONNÉES ====================
 def init_db():
@@ -105,13 +104,9 @@ def is_owner(user_id):
     """Vérifie si l'utilisateur est le propriétaire 7908680781"""
     return user_id == ADMIN_ID
 
-def is_admin_authenticated(user_id):
-    """Vérifie si l'admin est authentifié - TOUJOURS VRAI POUR LE PROPRIÉTAIRE"""
-    if is_owner(user_id):
-        return True
-    if user_id not in admin_sessions:
-        return False
-    return admin_sessions[user_id]['authenticated']
+def has_admin_access(user_id):
+    """Vérifie si l'utilisateur a accès aux fonctions admin"""
+    return is_owner(user_id)
 
 # ==================== FONCTIONS UTILISATEURS ====================
 def get_progress_bar():
@@ -253,8 +248,6 @@ def start_handler(message):
         
         # Vérifier si c'est le propriétaire 7908680781
         if is_owner(user_id):
-            # 7908680781 est TOUJOURS admin, pas besoin d'authentification
-            admin_sessions[user_id] = {'authenticated': True, 'auth_time': datetime.now()}
             activate_user_premium(user_id)  # Premium automatique
             
             caption = f"""
@@ -273,19 +266,6 @@ def start_handler(message):
 • 🔧 Outils professionnels
 
 🚀 **Utilisez les boutons ci-dessous !**
-"""
-            send_legendary_photo(message.chat.id, caption, create_owner_menu())
-            return
-        
-        # Vérifier si c'est un admin authentifié (pour autres utilisateurs)
-        if is_admin_authenticated(user_id):
-            caption = f"""
-👑 **{BOT_NAME} - {VERSION}**
-
-🎯 **Mode Admin Activé !**
-⭐ **Premium activé**
-
-💫 **Panel de contrôle débloqué**
 """
             send_legendary_photo(message.chat.id, caption, create_owner_menu())
             return
@@ -366,8 +346,8 @@ def stats_command(message):
     """Statistiques du bot"""
     user_id = message.from_user.id
     
-    # Vérifier les droits admin
-    if not is_owner(user_id) and not is_admin_authenticated(user_id):
+    # Vérifier les droits admin - SEUL 7908680781
+    if not is_owner(user_id):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nContactez l'administrateur.")
         return
     
@@ -393,7 +373,7 @@ def users_command(message):
     """Lister les utilisateurs"""
     user_id = message.from_user.id
     
-    if not is_owner(user_id) and not is_admin_authenticated(user_id):
+    if not is_owner(user_id):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nContactez l'administrateur.")
         return
     
@@ -422,7 +402,7 @@ def premium_all_command(message):
     """Donner le premium à tous"""
     user_id = message.from_user.id
     
-    if not is_owner(user_id) and not is_admin_authenticated(user_id):
+    if not is_owner(user_id):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nContactez l'administrateur.")
         return
     
@@ -438,7 +418,7 @@ def broadcast_command(message):
     """Envoyer un message à tous"""
     user_id = message.from_user.id
     
-    if not is_owner(user_id) and not is_admin_authenticated(user_id):
+    if not is_owner(user_id):
         bot.reply_to(message, "🔐 **Accès refusé.**\n\nContactez l'administrateur.")
         return
     
@@ -448,7 +428,7 @@ def broadcast_command(message):
 def process_broadcast(message):
     user_id = message.from_user.id
     
-    if not is_owner(user_id) and not is_admin_authenticated(user_id):
+    if not is_owner(user_id):
         bot.reply_to(message, "🔐 Accès refusé.")
         return
     
@@ -524,8 +504,8 @@ def callback_handler(call):
     
     # Callbacks admin - Vérification des droits
     elif call.data.startswith("admin_"):
-        # Vérifier si c'est 7908680781 ou un admin authentifié
-        if not is_owner(user_id) and not is_admin_authenticated(user_id):
+        # Vérifier si c'est 7908680781
+        if not is_owner(user_id):
             bot.answer_callback_query(call.id, "🔐 Accès refusé")
             bot.send_message(call.message.chat.id, "🔐 **Accès refusé.**\n\nContactez l'administrateur.")
             return
@@ -601,7 +581,7 @@ def callback_handler(call):
 def process_give_premium(message):
     user_id = message.from_user.id
     
-    if not is_owner(user_id) and not is_admin_authenticated(user_id):
+    if not is_owner(user_id):
         bot.reply_to(message, "🔐 Accès refusé.")
         return
     
@@ -703,8 +683,8 @@ if __name__ == "__main__":
     print(f"👑 Créateur: {CREATOR}")
     print("💎 SYSTÈME SANS AUTHENTIFICATION")
     print(f"   👑 Propriétaire: {ADMIN_ID}")
-    print("   🔓 Pas de mot de passe requis")
-    print("   ⭐ 7908680781 a tout débloqué automatiquement")
+    print("   🔓 Accès admin automatique pour 7908680781")
+    print("   🚫 Pas d'authentification requise")
     print("🤖 En attente de messages...")
     
     try:
