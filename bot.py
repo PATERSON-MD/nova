@@ -113,7 +113,7 @@ def load_settings():
         TEMPERATURE = result[4] or 0.7
     return AI_ENABLED, PREMIUM_REQUIRED
 
-def save_settings(ai_enabled=None, premium_required=None, current_model=None, max_tokens=None, temperature=None):
+def save_settings(ai_enabled=None, premium_required=None, new_model=None, max_tokens=None, temperature=None):
     global AI_ENABLED, PREMIUM_REQUIRED, current_model, MAX_TOKENS, TEMPERATURE
     
     conn = sqlite3.connect('bot_groups.db')
@@ -132,10 +132,10 @@ def save_settings(ai_enabled=None, premium_required=None, current_model=None, ma
         updates.append("premium_required = ?")
         values.append(premium_required)
     
-    if current_model is not None:
-        current_model = current_model
+    if new_model is not None:
+        current_model = new_model
         updates.append("current_model = ?")
-        values.append(current_model)
+        values.append(new_model)
     
     if max_tokens is not None:
         MAX_TOKENS = max_tokens
@@ -785,7 +785,7 @@ def callback_handler(call):
         elif call.data.startswith("admin_model_"):
             new_model = call.data.replace("admin_model_", "")
             if new_model in AI_MODELS:
-                save_settings(current_model=new_model)
+                save_settings(new_model=new_model)
                 bot.answer_callback_query(call.id, f"🧠 Modèle changé: {AI_MODELS[new_model]}")
                 send_legendary_photo(
                     call.message.chat.id,
