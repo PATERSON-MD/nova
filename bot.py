@@ -46,6 +46,8 @@ def init_db():
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     
+    # RECRÉATION COMPLÈTE DE TOUTES LES TABLES
+    c.execute('''DROP TABLE IF EXISTS user_access''')
     c.execute('''CREATE TABLE IF NOT EXISTS user_access
                  (user_id INTEGER PRIMARY KEY,
                   username TEXT,
@@ -58,12 +60,14 @@ def init_db():
                   added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                   last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
+    c.execute('''DROP TABLE IF EXISTS referrals''')
     c.execute('''CREATE TABLE IF NOT EXISTS referrals
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   referrer_id INTEGER,
                   referred_user_id INTEGER,
                   referral_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
+    c.execute('''DROP TABLE IF EXISTS user_activity''')
     c.execute('''CREATE TABLE IF NOT EXISTS user_activity
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   user_id INTEGER,
@@ -72,6 +76,7 @@ def init_db():
                   tokens_used INTEGER DEFAULT 0,
                   UNIQUE(user_id, activity_date))''')
     
+    c.execute('''DROP TABLE IF EXISTS ai_conversations''')
     c.execute('''CREATE TABLE IF NOT EXISTS ai_conversations
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   user_id INTEGER,
@@ -81,7 +86,6 @@ def init_db():
                   model_used TEXT,
                   conversation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # RECRÉATION COMPLÈTE DE LA TABLE bot_settings
     c.execute('''DROP TABLE IF EXISTS bot_settings''')
     c.execute('''CREATE TABLE IF NOT EXISTS bot_settings
                  (id INTEGER PRIMARY KEY CHECK (id = 1),
