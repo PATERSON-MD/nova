@@ -81,6 +81,8 @@ def init_db():
                   model_used TEXT,
                   conversation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
+    # RECRÉATION COMPLÈTE DE LA TABLE bot_settings
+    c.execute('''DROP TABLE IF EXISTS bot_settings''')
     c.execute('''CREATE TABLE IF NOT EXISTS bot_settings
                  (id INTEGER PRIMARY KEY CHECK (id = 1),
                   ai_enabled BOOLEAN DEFAULT TRUE,
