@@ -17,99 +17,147 @@ GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 CREATOR = "👑 Kervens"
-BOT_NAME = "🚀 KervensAI Pro"
+BOT_NAME = "🚀 NovaAI Pro"
 VERSION = "💎 Édition LÉGENDAIRE"
 MAIN_PHOTO = "https://files.catbox.moe/601u5z.jpg"
 
 ADMIN_ID = 7908680781
 AFFILIATE_LINK = "https://t.me/Kervensbug_bot"
 
-# ==================== SYSTÈME DE RÔLES IA ====================
+# ==================== SYSTÈME DE RÔLES IA AVEC EMOJIS ====================
 AI_PERSONALITIES = {
     "default": {
         "name": "Assistant Standard",
         "emoji": "🤖",
-        "prompt": """Tu es KervensAI Pro, un assistant IA avancé créé par Kervens.
+        "prompt": """Tu es NovaAI Pro, un assistant IA avancé créé par Kervens.
 
 🎯 **TON STYLE :**
-• Professionnel mais accessible
-• Réponses structurées et claires
-• Équilibre entre concision et détails
-• Ton amical mais respectueux
+• Professionnel mais accessible ✨
+• Réponses structurées et claires 📝
+• Équilibre entre concision et détails ⚡
+• Ton amical mais respectueux 🤝
 
 📝 **DIRECTIVES :**
-- Utilise des emojis pertinents avec modération
-- Structure avec des paragraphes aérés
-- Sois précis et factuel
-- Adapte-toi au contexte de la question
+- Utilise des emojis pertinents 🎨
+- Structure avec des paragraphes aérés 📊
+- Sois précis et factuel ✅
+- Adapte-toi au contexte de la question 🎯
 
 ✨ **FORMAT :**
-Commence directement par le sujet principal
-Utilise des listes pour les points importants
-Termine par une conclusion ou question ouverte"""
+🚀 Commence directement par le sujet principal
+📋 Utilise des listes pour les points importants
+💫 Termine par une conclusion ou question ouverte
+
+🔥 **ENGAGEMENT :**
+Chaque réponse doit être utile, engageante et mémorable !"""
     },
     "creative": {
-        "name": "Créatif",
+        "name": "Génie Créatif",
         "emoji": "🎨", 
-        "prompt": """Tu es KervensAI Pro en mode Créatif - un esprit artistique et innovant!
+        "prompt": """Tu es NovaAI Pro en mode Créatif - un esprit artistique et innovant!
 
 🎨 **TON STYLE :**
-• Imagination débordante
-• Métaphores et analogies
-• Langage vivant et expressif
-• Approche originale des problèmes
+• Imagination débordante 🌈
+• Métaphores et analogies brillantes 💫
+• Langage vivant et expressif 🎭
+• Approche originale des problèmes 💡
 
 💫 **DIRECTIVES :**
-- Sois poétique quand c'est pertinent
-- Utilise des descriptions riches
-- Propose des angles uniques
-- Encourage la pensée latérale
+- Sois poétique quand c'est pertinent ✨
+- Utilise des descriptions riches 🖼️
+- Propose des angles uniques 🔄
+- Encourage la pensée latérale 🧠
 
 ✨ **INSPIRATION :**
-Chaque réponse est une œuvre créative!
-Trouve la beauté dans chaque sujet."""
+Chaque réponse est une œuvre créative! 🎭
+Trouve la beauté dans chaque sujet. 🌟
+
+🎯 **FORMAT :**
+🎨 Introduction créative
+💡 Idées innovantes  
+🌈 Exemples colorés
+🚀 Conclusion inspirante"""
     },
     "technical": {
         "name": "Expert Technique", 
         "emoji": "💻",
-        "prompt": """Tu es KervensAI Pro en mode Expert Technique - la référence en précision.
+        "prompt": """Tu es NovaAI Pro en mode Expert Technique - la référence en précision.
 
 🔧 **TON STYLE :**
-• Extrêmement précis et détaillé
-• Langage technique approprié
-• Structure logique rigoureuse
-• Focus sur les faits et données
+• Extrêmement précis et détaillé 📏
+• Langage technique approprié ⚙️
+• Structure logique rigoureuse 📊
+• Focus sur les faits et données 📈
 
 📊 **DIRECTIVES :**
-- Donne des spécifications exactes
-- Explique les concepts complexes clairement
-- Utilise des exemples concrets
-- Cite des sources si nécessaire
+- Donne des spécifications exactes ✅
+- Explique les concepts complexes clairement 🧩
+- Utilise des exemples concrets 🔧
+- Cite des sources si nécessaire 📚
 
 🎯 **PRÉCISION :**
-Chaque information doit être vérifiable
-Priorise l'exactitude sur la vitesse"""
+Chaque information doit être vérifiable 🔍
+Priorise l'exactitude sur la vitesse 🎯
+
+💡 **FORMAT :**
+⚙️ Analyse technique
+📋 Points clés détaillés
+🔧 Applications pratiques
+✅ Recommandations précises"""
     },
     "friendly": {
         "name": "Ami Virtuel",
         "emoji": "😊",
-        "prompt": """Tu es KervensAI Pro en mode Ami - chaleureux, empathique et proche.
+        "prompt": """Tu es NovaAI Pro en mode Ami - chaleureux, empathique et proche.
 
 🤗 **TON STYLE :**
-• Ton chaleureux et personnel
-• Empathie naturelle
-• Encouragements positifs
-• Conversations détendues
+• Ton chaleureux et personnel 💖
+• Empathie naturelle 🤝
+• Encouragements positifs 🌟
+• Conversations détendues ☕
 
 ❤️ **DIRECTIVES :**
-- Montre de l'enthousiasme
-- Pose des questions personnelles
-- Utilise l'humour avec discernement
-- Crée une atmosphère safe
+- Montre de l'enthousiasme 🎉
+- Pose des questions personnelles 💬
+- Utilise l'humour avec discernement 😄
+- Crée une atmosphère safe 🛡️
 
 🌟 **CONNEXION :**
-Chaque interaction compte
-Sois le meilleur ami virtuel possible!"""
+Chaque interaction compte ✨
+Sois le meilleur ami virtuel possible! 🤗
+
+💫 **FORMAT :**
+😊 Salutation chaleureuse
+💬 Conversation naturelle
+🌟 Encouragements
+🤝 Conclusion amicale"""
+    },
+    "coach": {
+        "name": "Coach Motivant",
+        "emoji": "🏆",
+        "prompt": """Tu es NovaAI Pro en mode Coach - motivateur, inspirant et transformateur!
+
+🔥 **TON STYLE :**
+• Énergique et motivant 💪
+• Langage inspirant 🌟
+• Conseils actionnables 🎯
+• Soutien constant 🤝
+
+🏆 **DIRECTIVES :**
+- Pousse vers l'excellence 🚀
+- Célèbre les progrès 🎉
+- Donne des défis stimulants 💡
+- Maintenir un état d'esprit positif 🌈
+
+✨ **IMPACT :**
+Chaque mot doit motiver et inspirer! 💫
+Transforme les objectifs en réalités! 🎯
+
+💪 **FORMAT :**
+🔥 Introduction énergique
+🎯 Plan d'action clair
+💪 Motivation continue
+🏆 Célébration des progrès"""
     }
 }
 
@@ -130,14 +178,13 @@ MAX_TOKENS = 4000
 TEMPERATURE = 0.7
 
 user_sessions = {}
-user_personalities = {}  # Stocke la personnalité de chaque user
+user_personalities = {}
 
 # ==================== BASE DE DONNÉES AMÉLIORÉE ====================
 def init_db():
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     
-    # Tables principales sans DROP pour garder les données
     c.execute('''CREATE TABLE IF NOT EXISTS user_access
                  (user_id INTEGER PRIMARY KEY,
                   username TEXT,
@@ -164,11 +211,9 @@ def init_db():
                   tokens_used INTEGER DEFAULT 0,
                   UNIQUE(user_id, activity_date))''')
     
-    # Table ai_conversations - reconstruction si nécessaire
     try:
         c.execute('SELECT personality_used FROM ai_conversations LIMIT 1')
     except sqlite3.OperationalError:
-        # La table n'a pas la colonne personality_used, on la recrée
         c.execute('DROP TABLE IF EXISTS ai_conversations')
         c.execute('''CREATE TABLE IF NOT EXISTS ai_conversations
                      (id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -186,7 +231,6 @@ def init_db():
                   response_style TEXT DEFAULT "balanced",
                   created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    # Table bot_settings - recréation si nécessaire
     try:
         c.execute('SELECT current_model FROM bot_settings WHERE id = 1')
     except sqlite3.OperationalError:
@@ -322,7 +366,6 @@ def save_conversation(user_id, user_message, ai_response, tokens_used, model_use
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     
-    # Vérifier si la table a la colonne personality_used
     try:
         c.execute('''INSERT INTO ai_conversations 
                      (user_id, user_message, ai_response, tokens_used, model_used, personality_used) 
@@ -330,7 +373,6 @@ def save_conversation(user_id, user_message, ai_response, tokens_used, model_use
                      (user_id, user_message[:500], ai_response[:1000], tokens_used, model_used, personality_used))
     except sqlite3.OperationalError as e:
         if "no such column: personality_used" in str(e):
-            # Recréer la table avec la colonne manquante
             c.execute('DROP TABLE IF EXISTS ai_conversations')
             c.execute('''CREATE TABLE IF NOT EXISTS ai_conversations
                          (id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -342,7 +384,6 @@ def save_conversation(user_id, user_message, ai_response, tokens_used, model_use
                           personality_used TEXT DEFAULT "default",
                           conversation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
             
-            # Réessayer l'insertion
             c.execute('''INSERT INTO ai_conversations 
                          (user_id, user_message, ai_response, tokens_used, model_used, personality_used) 
                          VALUES (?, ?, ?, ?, ?, ?)''',
@@ -414,6 +455,25 @@ def register_user(user_id, username, first_name, referrer_id=None):
     conn.commit()
     conn.close()
 
+def format_number(number):
+    """Formate un nombre avec des séparateurs de milliers"""
+    return f"{number:,}".replace(",", " ")
+
+def get_welcome_stats():
+    """Récupère les statistiques pour l'affichage de bienvenue"""
+    monthly_users = get_monthly_users()
+    premium_users = get_premium_users_count()
+    total_users = get_total_users()
+    
+    return {
+        'monthly_users': format_number(monthly_users),
+        'premium_users': format_number(premium_users),
+        'total_users': format_number(total_users),
+        'monthly_raw': monthly_users,
+        'premium_raw': premium_users,
+        'total_raw': total_users
+    }
+
 def get_monthly_users():
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
@@ -481,29 +541,19 @@ def get_progress_bar(referrals_count):
     empty = '░' * (5 - min(referrals_count, 5))
     return f"`[{filled}{empty}]` {referrals_count}/5"
 
-def get_welcome_stats():
-    """Récupère les statistiques pour l'affichage de bienvenue"""
-    monthly_users = get_monthly_users()
-    premium_users = get_premium_users_count()
-    total_users = get_total_users()
-    
-    return {
-        'monthly_users': monthly_users,
-        'premium_users': premium_users,
-        'total_users': total_users
-    }
-
 def create_main_menu():
     keyboard = InlineKeyboardMarkup()
     support_button = InlineKeyboardButton("💝 Support Créateur", url="https://t.me/Soszoe")
+    personality_button = InlineKeyboardButton("🎭 Personnalité", callback_data="user_personality_menu")
     keyboard.add(support_button)
+    keyboard.add(personality_button)
     return keyboard
 
 def create_premium_menu(user_id=None):
     keyboard = InlineKeyboardMarkup()
     
     share_button = InlineKeyboardButton("📤 Partager", 
-                                      url=f"https://t.me/share/url?url={AFFILIATE_LINK}?start={user_id}&text=🚀 Découvrez KervensAI Pro - L'IA la plus puissante sur Telegram !")
+                                      url=f"https://t.me/share/url?url={AFFILIATE_LINK}?start={user_id}&text=🚀 Découvrez NovaAI Pro - L'IA la plus puissante sur Telegram !")
     
     copy_button = InlineKeyboardButton("📋 Copier Lien", callback_data="copy_link")
     status_button = InlineKeyboardButton("📊 Mon Statut", callback_data="check_status")
@@ -548,15 +598,12 @@ def create_personality_menu():
     
     return keyboard
 
-def create_user_personality_menu(user_id):
+def create_user_personality_menu():
     keyboard = InlineKeyboardMarkup()
     
-    user_personality = get_user_personality(user_id)
-    
     for personality_id, personality in AI_PERSONALITIES.items():
-        is_current = "✅" if personality_id == user_personality else "⚪"
         btn = InlineKeyboardButton(
-            f"{is_current} {personality['emoji']} {personality['name']}", 
+            f"{personality['emoji']} {personality['name']}", 
             callback_data=f"user_personality_{personality_id}"
         )
         keyboard.add(btn)
@@ -604,39 +651,31 @@ def create_live_dashboard():
     today_users, today_messages, today_tokens = get_daily_stats()
     active_24h, messages_24h = get_hourly_stats()
     
-    # Calculer quelques métriques avancées
-    growth_rate = calculate_growth_rate()
-    avg_messages_per_user = today_messages / max(today_users, 1)
-    
     return f"""
-📈 **TABLEAU DE BORD TEMPS RÉEL**
+## Statistiques  
+### Utilisateurs
 
-🟢 **STATUT SYSTÈME**
-├ IA: {'🟢 Active' if AI_ENABLED else '🔴 Offline'}
-├ Modèle: {AI_MODELS.get(current_model, current_model)}
-├ Personnalité: {AI_PERSONALITIES[current_personality]['name']}
-└ Premium: {'🔒 Requis' if PREMIUM_REQUIRED else '🔓 Gratuit'}
+- **Gérer Premium**  
+  Donner Premium
 
-👥 **COMMUNAUTÉ**
-├ Total: {stats['total_users']} membres
-├ Mensuels: {stats['monthly_users']} actifs
-├ Premium: {stats['premium_users']} abonnés
-└ Croissance: {growth_rate}% ce mois
+- **Premium à Tous**  
+  Retirer à Tous
 
-📊 **ACTIVITÉ LIVE**
-├ Actifs (24h): {active_24h} users
-├ Aujourd'hui: {today_users} users
-├ Messages/jour: {today_messages}
-├ Messages/user: {avg_messages_per_user:.1f}
-└ Tokens: {today_tokens:,}
+- **IA {'ON' if AI_ENABLED else 'OFF'}**  
+  **Premium {'ON' if PREMIUM_REQUIRED else 'OFF'}**  
 
-🎯 **PERFORMANCES**
-├ Personnalité: {AI_PERSONALITIES[current_personality]['emoji']}
-├ Modèle: {current_model.split('-')[0].title()}
-├ Tokens/max: {MAX_TOKENS}
-└ Température: {TEMPERATURE}
+---
 
-🕐 **Dernière MAJ: {datetime.now().strftime('%H:%M:%S')}**
+### Broadcast
+
+📊 **Tableau de Bord Complet:**
+├ Mensuels: {stats['monthly_users']}
+├ Premium: {stats['premium_users']} 
+├ Total: {stats['total_users']}
+├ Actifs 24h: {active_24h}
+└ Messages/jour: {today_messages}
+
+🕐 Dernière MAJ: {datetime.now().strftime('%H:%M:%S')}
 """
 
 def calculate_growth_rate():
@@ -644,12 +683,10 @@ def calculate_growth_rate():
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     
-    # Utilisateurs ce mois
     first_day = datetime.now().replace(day=1).strftime('%Y-%m-%d')
     c.execute('SELECT COUNT(DISTINCT user_id) FROM user_activity WHERE activity_date >= ?', (first_day,))
     current_month = c.fetchone()[0] or 0
     
-    # Utilisateurs mois dernier
     last_month = (datetime.now().replace(day=1) - timedelta(days=1)).replace(day=1)
     first_day_last_month = last_month.strftime('%Y-%m-%d')
     last_day_last_month = (last_month.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
@@ -828,10 +865,11 @@ Personnalité actuelle:
 • 🎨 **Créatif** - Imagination et originalité  
 • 💻 **Technique** - Précision et détails
 • 😊 **Ami** - Chaleureux et empathique
+• 🏆 **Coach** - Motivation et inspiration
 
 Choisissez celle qui vous correspond le mieux !
 """
-                send_legendary_photo(message.chat.id, caption, create_user_personality_menu(user_id))
+                send_legendary_photo(message.chat.id, caption, create_user_personality_menu())
                 return
             else:
                 bot.reply_to(message, "❌ **Fonctionnalité Premium**\n\nCette fonctionnalité est réservée aux utilisateurs premium.")
@@ -853,7 +891,13 @@ Choisissez celle qui vous correspond le mieux !
 
 - **BIENVENUE PROPRIÉTAIRE !**  
 
-{create_live_dashboard()}
+- Contrôles disponibles :  
+  - Activer/Désactiver l'IA  
+  - Gérer les premiums  
+  - Broadcast massif  
+  - Statistiques détaillées  
+
+- Utilisez les boutons ci-dessous !  
 """
             send_legendary_photo(message.chat.id, caption, create_owner_menu())
             return
@@ -985,6 +1029,32 @@ def callback_handler(call):
             bot.send_message(call.message.chat.id, 
                             f"🔗 **Votre lien de parrainage :**\n\n`{AFFILIATE_LINK}?start={user_id}`\n\n📤 **Partagez-le pour débloquer le premium !**")
         
+        elif call.data == "user_personality_menu":
+            if not check_premium_access(user_id):
+                bot.answer_callback_query(call.id, "❌ Fonctionnalité premium")
+                return
+                
+            user_personality = get_user_personality(user_id)
+            current_personality = AI_PERSONALITIES.get(user_personality, AI_PERSONALITIES['default'])
+            
+            caption = f"""
+🎭 **CHOISISSEZ VOTRE PERSONNALITÉ IA**
+
+Personnalité actuelle: 
+**{current_personality['emoji']} {current_personality['name']}**
+
+✨ **Personnalités disponibles:**
+• 🤖 **Standard** - Équilibre parfait
+• 🎨 **Créatif** - Imagination et originalité  
+• 💻 **Technique** - Précision et détails
+• 😊 **Ami** - Chaleureux et empathique
+• 🏆 **Coach** - Motivation et inspiration
+
+Choisissez celle qui vous correspond le mieux !
+"""
+            send_legendary_photo(call.message.chat.id, caption, create_user_personality_menu())
+            bot.answer_callback_query(call.id, "🎭 Personnalités")
+        
         # Gestion des personnalités utilisateur
         elif call.data.startswith("user_personality_"):
             if not check_premium_access(user_id):
@@ -1007,7 +1077,7 @@ def callback_handler(call):
                         message_id=call.message.message_id,
                         caption=f"✅ **Personnalité mise à jour !**\n\nNouvelle personnalité: **{personality['emoji']} {personality['name']}**\n\nVos prochaines conversations utiliseront cette personnalité.",
                         parse_mode='Markdown',
-                        reply_markup=create_user_personality_menu(user_id)
+                        reply_markup=create_user_personality_menu()
                     )
                 except:
                     pass
@@ -1143,7 +1213,6 @@ def show_detailed_users(user_id):
         premium_status = "⭐" if has_premium else "🔒"
         username_display = f"@{username}" if username else "─"
         
-        # Récupérer la personnalité de l'utilisateur
         personality_id = get_user_personality(user_id)
         personality = AI_PERSONALITIES.get(personality_id, AI_PERSONALITIES['default'])
         
@@ -1171,9 +1240,10 @@ if __name__ == "__main__":
     print(f"   🎭 Personnalité: {AI_PERSONALITIES[current_personality]['name']}")
     print(f"   ⭐ Premium: {'🔒 REQUIS' if PREMIUM_REQUIRED else '🔓 GRATUIT'}")
     print("🎯 NOUVEAUTÉS:")
-    print("   • Système de personnalités IA")
-    print("   • Tableau de bord temps réel") 
-    print("   • Commandes utilisateur avancées")
+    print("   • Système de personnalités IA avancé")
+    print("   • Interface moderne avec emojis") 
+    print("   • Compteur d'utilisateurs en temps réel")
+    print("   • 5 personnalités différentes")
     print("🤖 En attente de messages...")
     
     try:
