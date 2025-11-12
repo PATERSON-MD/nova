@@ -24,6 +24,95 @@ MAIN_PHOTO = "https://files.catbox.moe/601u5z.jpg"
 ADMIN_ID = 7908680781
 AFFILIATE_LINK = "https://t.me/Kervensbug_bot"
 
+# ==================== SYSTÈME DE RÔLES IA ====================
+AI_PERSONALITIES = {
+    "default": {
+        "name": "Assistant Standard",
+        "emoji": "🤖",
+        "prompt": """Tu es KervensAI Pro, un assistant IA avancé créé par Kervens.
+
+🎯 **TON STYLE :**
+• Professionnel mais accessible
+• Réponses structurées et claires
+• Équilibre entre concision et détails
+• Ton amical mais respectueux
+
+📝 **DIRECTIVES :**
+- Utilise des emojis pertinents avec modération
+- Structure avec des paragraphes aérés
+- Sois précis et factuel
+- Adapte-toi au contexte de la question
+
+✨ **FORMAT :**
+Commence directement par le sujet principal
+Utilise des listes pour les points importants
+Termine par une conclusion ou question ouverte"""
+    },
+    "creative": {
+        "name": "Créatif",
+        "emoji": "🎨", 
+        "prompt": """Tu es KervensAI Pro en mode Créatif - un esprit artistique et innovant!
+
+🎨 **TON STYLE :**
+• Imagination débordante
+• Métaphores et analogies
+• Langage vivant et expressif
+• Approche originale des problèmes
+
+💫 **DIRECTIVES :**
+- Sois poétique quand c'est pertinent
+- Utilise des descriptions riches
+- Propose des angles uniques
+- Encourage la pensée latérale
+
+✨ **INSPIRATION :**
+Chaque réponse est une œuvre créative!
+Trouve la beauté dans chaque sujet."""
+    },
+    "technical": {
+        "name": "Expert Technique", 
+        "emoji": "💻",
+        "prompt": """Tu es KervensAI Pro en mode Expert Technique - la référence en précision.
+
+🔧 **TON STYLE :**
+• Extrêmement précis et détaillé
+• Langage technique approprié
+• Structure logique rigoureuse
+• Focus sur les faits et données
+
+📊 **DIRECTIVES :**
+- Donne des spécifications exactes
+- Explique les concepts complexes clairement
+- Utilise des exemples concrets
+- Cite des sources si nécessaire
+
+🎯 **PRÉCISION :**
+Chaque information doit être vérifiable
+Priorise l'exactitude sur la vitesse"""
+    },
+    "friendly": {
+        "name": "Ami Virtuel",
+        "emoji": "😊",
+        "prompt": """Tu es KervensAI Pro en mode Ami - chaleureux, empathique et proche.
+
+🤗 **TON STYLE :**
+• Ton chaleureux et personnel
+• Empathie naturelle
+• Encouragements positifs
+• Conversations détendues
+
+❤️ **DIRECTIVES :**
+- Montre de l'enthousiasme
+- Pose des questions personnelles
+- Utilise l'humour avec discernement
+- Crée une atmosphère safe
+
+🌟 **CONNEXION :**
+Chaque interaction compte
+Sois le meilleur ami virtuel possible!"""
+    }
+}
+
 # MODÈLES IA DISPONIBLES
 AI_MODELS = {
     "llama-3.1-8b-instant": "🚀 Rapide & Léger",
@@ -34,20 +123,21 @@ AI_MODELS = {
 
 # CONFIGURATION IA
 current_model = "llama-3.1-8b-instant"
+current_personality = "default"
 AI_ENABLED = True
 PREMIUM_REQUIRED = True
 MAX_TOKENS = 4000
 TEMPERATURE = 0.7
 
 user_sessions = {}
+user_personalities = {}  # Stocke la personnalité de chaque user
 
 # ==================== BASE DE DONNÉES AMÉLIORÉE ====================
 def init_db():
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     
-    # RECRÉATION COMPLÈTE DE TOUTES LES TABLES
-    c.execute('''DROP TABLE IF EXISTS user_access''')
+    # Tables principales sans DROP pour garder les données
     c.execute('''CREATE TABLE IF NOT EXISTS user_access
                  (user_id INTEGER PRIMARY KEY,
                   username TEXT,
@@ -60,14 +150,12 @@ def init_db():
                   added_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                   last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    c.execute('''DROP TABLE IF EXISTS referrals''')
     c.execute('''CREATE TABLE IF NOT EXISTS referrals
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   referrer_id INTEGER,
                   referred_user_id INTEGER,
                   referral_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    c.execute('''DROP TABLE IF EXISTS user_activity''')
     c.execute('''CREATE TABLE IF NOT EXISTS user_activity
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   user_id INTEGER,
@@ -76,7 +164,6 @@ def init_db():
                   tokens_used INTEGER DEFAULT 0,
                   UNIQUE(user_id, activity_date))''')
     
-    c.execute('''DROP TABLE IF EXISTS ai_conversations''')
     c.execute('''CREATE TABLE IF NOT EXISTS ai_conversations
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   user_id INTEGER,
@@ -84,43 +171,61 @@ def init_db():
                   ai_response TEXT,
                   tokens_used INTEGER,
                   model_used TEXT,
+                  personality_used TEXT,
                   conversation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    c.execute('''DROP TABLE IF EXISTS bot_settings''')
-    c.execute('''CREATE TABLE IF NOT EXISTS bot_settings
-                 (id INTEGER PRIMARY KEY CHECK (id = 1),
-                  ai_enabled BOOLEAN DEFAULT TRUE,
-                  premium_required BOOLEAN DEFAULT TRUE,
-                  current_model TEXT DEFAULT "llama-3.1-8b-instant",
-                  max_tokens INTEGER DEFAULT 4000,
-                  temperature REAL DEFAULT 0.7)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS user_preferences
+                 (user_id INTEGER PRIMARY KEY,
+                  personality TEXT DEFAULT "default",
+                  response_style TEXT DEFAULT "balanced",
+                  created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
-    c.execute('''INSERT OR IGNORE INTO bot_settings 
-                 (id, ai_enabled, premium_required, current_model, max_tokens, temperature) 
-                 VALUES (1, TRUE, TRUE, "llama-3.1-8b-instant", 4000, 0.7)''')
+    # Table bot_settings - recréation si nécessaire
+    try:
+        c.execute('SELECT current_model FROM bot_settings WHERE id = 1')
+    except sqlite3.OperationalError:
+        c.execute('DROP TABLE IF EXISTS bot_settings')
+        c.execute('''CREATE TABLE IF NOT EXISTS bot_settings
+                     (id INTEGER PRIMARY KEY CHECK (id = 1),
+                      ai_enabled BOOLEAN DEFAULT TRUE,
+                      premium_required BOOLEAN DEFAULT TRUE,
+                      current_model TEXT DEFAULT "llama-3.1-8b-instant",
+                      current_personality TEXT DEFAULT "default",
+                      max_tokens INTEGER DEFAULT 4000,
+                      temperature REAL DEFAULT 0.7)''')
+        
+        c.execute('''INSERT OR IGNORE INTO bot_settings 
+                     (id, ai_enabled, premium_required, current_model, current_personality, max_tokens, temperature) 
+                     VALUES (1, TRUE, TRUE, "llama-3.1-8b-instant", "default", 4000, 0.7)''')
     
     conn.commit()
     conn.close()
     print("✅ Base de données avancée initialisée")
 
 def load_settings():
-    global AI_ENABLED, PREMIUM_REQUIRED, current_model, MAX_TOKENS, TEMPERATURE
+    global AI_ENABLED, PREMIUM_REQUIRED, current_model, current_personality, MAX_TOKENS, TEMPERATURE
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
-    c.execute('SELECT ai_enabled, premium_required, current_model, max_tokens, temperature FROM bot_settings WHERE id = 1')
-    result = c.fetchone()
-    conn.close()
     
-    if result:
-        AI_ENABLED = bool(result[0])
-        PREMIUM_REQUIRED = bool(result[1])
-        current_model = result[2] or "llama-3.1-8b-instant"
-        MAX_TOKENS = result[3] or 4000
-        TEMPERATURE = result[4] or 0.7
+    try:
+        c.execute('SELECT ai_enabled, premium_required, current_model, current_personality, max_tokens, temperature FROM bot_settings WHERE id = 1')
+        result = c.fetchone()
+        
+        if result:
+            AI_ENABLED = bool(result[0])
+            PREMIUM_REQUIRED = bool(result[1])
+            current_model = result[2] or "llama-3.1-8b-instant"
+            current_personality = result[3] or "default"
+            MAX_TOKENS = result[4] or 4000
+            TEMPERATURE = result[5] or 0.7
+    except sqlite3.OperationalError:
+        print("⚠️ Table bot_settings non trouvée, utilisation des valeurs par défaut")
+    
+    conn.close()
     return AI_ENABLED, PREMIUM_REQUIRED
 
-def save_settings(ai_enabled=None, premium_required=None, new_model=None, max_tokens=None, temperature=None):
-    global AI_ENABLED, PREMIUM_REQUIRED, current_model, MAX_TOKENS, TEMPERATURE
+def save_settings(ai_enabled=None, premium_required=None, new_model=None, new_personality=None, max_tokens=None, temperature=None):
+    global AI_ENABLED, PREMIUM_REQUIRED, current_model, current_personality, MAX_TOKENS, TEMPERATURE
     
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
@@ -143,6 +248,11 @@ def save_settings(ai_enabled=None, premium_required=None, new_model=None, max_to
         updates.append("current_model = ?")
         values.append(new_model)
     
+    if new_personality is not None:
+        current_personality = new_personality
+        updates.append("current_personality = ?")
+        values.append(new_personality)
+    
     if max_tokens is not None:
         MAX_TOKENS = max_tokens
         updates.append("max_tokens = ?")
@@ -156,6 +266,32 @@ def save_settings(ai_enabled=None, premium_required=None, new_model=None, max_to
     if updates:
         query = f"UPDATE bot_settings SET {', '.join(updates)} WHERE id = 1"
         c.execute(query, values)
+    
+    conn.commit()
+    conn.close()
+
+def get_user_personality(user_id):
+    """Récupère la personnalité préférée de l'utilisateur"""
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    
+    try:
+        c.execute('SELECT personality FROM user_preferences WHERE user_id = ?', (user_id,))
+        result = c.fetchone()
+        return result[0] if result else "default"
+    except sqlite3.OperationalError:
+        return "default"
+    finally:
+        conn.close()
+
+def set_user_personality(user_id, personality):
+    """Définit la personnalité préférée de l'utilisateur"""
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    
+    c.execute('''INSERT OR REPLACE INTO user_preferences 
+                 (user_id, personality) 
+                 VALUES (?, ?)''', (user_id, personality))
     
     conn.commit()
     conn.close()
@@ -176,19 +312,19 @@ def update_user_stats(user_id, tokens_used=0):
     conn.commit()
     conn.close()
 
-def save_conversation(user_id, user_message, ai_response, tokens_used, model_used):
+def save_conversation(user_id, user_message, ai_response, tokens_used, model_used, personality_used):
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     
     c.execute('''INSERT INTO ai_conversations 
-                 (user_id, user_message, ai_response, tokens_used, model_used) 
-                 VALUES (?, ?, ?, ?, ?)''',
-                 (user_id, user_message[:500], ai_response[:1000], tokens_used, model_used))
+                 (user_id, user_message, ai_response, tokens_used, model_used, personality_used) 
+                 VALUES (?, ?, ?, ?, ?, ?)''',
+                 (user_id, user_message[:500], ai_response[:1000], tokens_used, model_used, personality_used))
     
     conn.commit()
     conn.close()
 
-# ==================== FONCTIONS EXISTANTES (optimisées) ====================
+# ==================== FONCTIONS UTILISATEURS ====================
 def check_premium_access(user_id):
     if not PREMIUM_REQUIRED:
         return True
@@ -291,6 +427,22 @@ def get_daily_stats():
     conn.close()
     return today_users, today_messages, today_tokens
 
+def get_hourly_stats():
+    """Statistiques des dernières 24 heures"""
+    conn = sqlite3.connect('bot_groups.db')
+    c = conn.cursor()
+    
+    last_24h = (datetime.now() - timedelta(hours=24)).strftime('%Y-%m-%d %H:%M:%S')
+    
+    c.execute('SELECT COUNT(*) FROM user_activity WHERE datetime(activity_date) >= ?', (last_24h,))
+    active_users_24h = c.fetchone()[0] or 0
+    
+    c.execute('SELECT SUM(message_count) FROM user_activity WHERE datetime(activity_date) >= ?', (last_24h,))
+    messages_24h = c.fetchone()[0] or 0
+    
+    conn.close()
+    return active_users_24h, messages_24h
+
 def is_owner(user_id):
     return user_id == ADMIN_ID
 
@@ -337,26 +489,51 @@ def create_premium_menu(user_id=None):
 def create_owner_menu():
     keyboard = InlineKeyboardMarkup()
     
-    # 📊 ANALYTIQUES
-    stats_btn = InlineKeyboardButton("📊 Stats", callback_data="admin_stats")
-    users_btn = InlineKeyboardButton("👥 Users", callback_data="admin_users")
-    
-    # ⭐ PREMIUM
+    stats_btn = InlineKeyboardButton("📊 Tableau de Bord", callback_data="admin_dashboard")
+    users_btn = InlineKeyboardButton("👥 Utilisateurs", callback_data="admin_users")
     premium_btn = InlineKeyboardButton("⭐ Premium", callback_data="admin_premium")
-    give_premium_btn = InlineKeyboardButton("🎁 Donner", callback_data="admin_give_premium")
-    
-    # 🤖 IA
     ai_btn = InlineKeyboardButton("🤖 Contrôle IA", callback_data="admin_ai_control")
     models_btn = InlineKeyboardButton("🧠 Modèles", callback_data="admin_models")
+    personality_btn = InlineKeyboardButton("🎭 Personnalités", callback_data="admin_personalities")
     
-    # 📢 COM
-    broadcast_btn = InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast")
-    settings_btn = InlineKeyboardButton("⚙️ Settings", callback_data="admin_settings")
-    
-    keyboard.add(stats_btn, users_btn)
-    keyboard.add(premium_btn, give_premium_btn)
+    keyboard.add(stats_btn)
+    keyboard.add(users_btn, premium_btn)
     keyboard.add(ai_btn, models_btn)
-    keyboard.add(broadcast_btn, settings_btn)
+    keyboard.add(personality_btn)
+    
+    return keyboard
+
+def create_personality_menu():
+    keyboard = InlineKeyboardMarkup()
+    
+    for personality_id, personality in AI_PERSONALITIES.items():
+        is_current = "✅" if personality_id == current_personality else "⚪"
+        btn = InlineKeyboardButton(
+            f"{is_current} {personality['emoji']} {personality['name']}", 
+            callback_data=f"admin_personality_{personality_id}"
+        )
+        keyboard.add(btn)
+    
+    back_btn = InlineKeyboardButton("🔙 Retour", callback_data="admin_back")
+    keyboard.add(back_btn)
+    
+    return keyboard
+
+def create_user_personality_menu(user_id):
+    keyboard = InlineKeyboardMarkup()
+    
+    user_personality = get_user_personality(user_id)
+    
+    for personality_id, personality in AI_PERSONALITIES.items():
+        is_current = "✅" if personality_id == user_personality else "⚪"
+        btn = InlineKeyboardButton(
+            f"{is_current} {personality['emoji']} {personality['name']}", 
+            callback_data=f"user_personality_{personality_id}"
+        )
+        keyboard.add(btn)
+    
+    back_btn = InlineKeyboardButton("🔙 Retour", callback_data="user_back")
+    keyboard.add(back_btn)
     
     return keyboard
 
@@ -368,7 +545,6 @@ def create_ai_control_menu():
     
     ai_toggle = InlineKeyboardButton(f"IA: {ai_status}", callback_data="admin_toggle_ai")
     premium_toggle = InlineKeyboardButton(f"Premium: {premium_status}", callback_data="admin_toggle_premium")
-    
     tokens_btn = InlineKeyboardButton(f"📏 Tokens: {MAX_TOKENS}", callback_data="admin_tokens")
     temp_btn = InlineKeyboardButton(f"🌡️ Temp: {TEMPERATURE}", callback_data="admin_temperature")
     back_btn = InlineKeyboardButton("🔙 Retour", callback_data="admin_back")
@@ -392,97 +568,86 @@ def create_models_menu():
     
     return keyboard
 
-def create_premium_management_menu():
-    keyboard = InlineKeyboardMarkup()
-    
-    give_btn = InlineKeyboardButton("🎁 Donner", callback_data="admin_give_premium")
-    remove_btn = InlineKeyboardButton("🔒 Retirer", callback_data="admin_remove_premium")
-    all_btn = InlineKeyboardButton("⚡ À Tous", callback_data="admin_premium_all")
-    remove_all_btn = InlineKeyboardButton("🗑️ Retirer Tous", callback_data="admin_remove_all_premium")
-    back_btn = InlineKeyboardButton("🔙 Retour", callback_data="admin_back")
-    
-    keyboard.add(give_btn, remove_btn)
-    keyboard.add(all_btn, remove_all_btn)
-    keyboard.add(back_btn)
-    
-    return keyboard
-
-# ==================== FONCTIONS ADMIN AVANCÉES ====================
-def show_advanced_stats(user_id):
-    total_users = get_total_users()
-    premium_users = get_premium_users_count()
-    monthly_users = get_monthly_users()
+# ==================== TABLEAU DE BORD AVANCÉ ====================
+def create_live_dashboard():
+    """Crée un tableau de bord en temps réel"""
+    stats = get_welcome_stats()
     today_users, today_messages, today_tokens = get_daily_stats()
+    active_24h, messages_24h = get_hourly_stats()
     
-    # Stats tokens totaux
+    # Calculer quelques métriques avancées
+    growth_rate = calculate_growth_rate()
+    avg_messages_per_user = today_messages / max(today_users, 1)
+    
+    return f"""
+📈 **TABLEAU DE BORD TEMPS RÉEL**
+
+🟢 **STATUT SYSTÈME**
+├ IA: {'🟢 Active' if AI_ENABLED else '🔴 Offline'}
+├ Modèle: {AI_MODELS.get(current_model, current_model)}
+├ Personnalité: {AI_PERSONALITIES[current_personality]['name']}
+└ Premium: {'🔒 Requis' if PREMIUM_REQUIRED else '🔓 Gratuit'}
+
+👥 **COMMUNAUTÉ**
+├ Total: {stats['total_users']} membres
+├ Mensuels: {stats['monthly_users']} actifs
+├ Premium: {stats['premium_users']} abonnés
+└ Croissance: {growth_rate}% ce mois
+
+📊 **ACTIVITÉ LIVE**
+├ Actifs (24h): {active_24h} users
+├ Aujourd'hui: {today_users} users
+├ Messages/jour: {today_messages}
+├ Messages/user: {avg_messages_per_user:.1f}
+└ Tokens: {today_tokens:,}
+
+🎯 **PERFORMANCES**
+├ Personnalité: {AI_PERSONALITIES[current_personality]['emoji']}
+├ Modèle: {current_model.split('-')[0].title()}
+├ Tokens/max: {MAX_TOKENS}
+└ Température: {TEMPERATURE}
+
+🕐 **Dernière MAJ: {datetime.now().strftime('%H:%M:%S')}**
+"""
+
+def calculate_growth_rate():
+    """Calcule le taux de croissance du mois"""
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
-    c.execute('SELECT SUM(total_tokens) FROM user_access')
-    total_tokens = c.fetchone()[0] or 0
+    
+    # Utilisateurs ce mois
+    first_day = datetime.now().replace(day=1).strftime('%Y-%m-%d')
+    c.execute('SELECT COUNT(DISTINCT user_id) FROM user_activity WHERE activity_date >= ?', (first_day,))
+    current_month = c.fetchone()[0] or 0
+    
+    # Utilisateurs mois dernier
+    last_month = (datetime.now().replace(day=1) - timedelta(days=1)).replace(day=1)
+    first_day_last_month = last_month.strftime('%Y-%m-%d')
+    last_day_last_month = (last_month.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+    
+    c.execute('SELECT COUNT(DISTINCT user_id) FROM user_activity WHERE activity_date BETWEEN ? AND ?', 
+              (first_day_last_month, last_day_last_month.strftime('%Y-%m-%d')))
+    previous_month = c.fetchone()[0] or 0
+    
     conn.close()
     
-    ai_status = "🟢 ACTIVÉE" if AI_ENABLED else "🔴 DÉSACTIVÉE"
-    premium_status = "🔒 REQUIS" if PREMIUM_REQUIRED else "🔓 GRATUIT"
-    current_model_name = AI_MODELS.get(current_model, current_model)
+    if previous_month == 0:
+        return 100 if current_month > 0 else 0
     
-    stats_text = f"""
-📊 **STATISTIQUES AVANCÉES - {BOT_NAME}**
+    growth = ((current_month - previous_month) / previous_month) * 100
+    return round(growth, 1)
 
-🤖 **IA :** {ai_status}
-🧠 **Modèle :** {current_model_name}
-⭐ **Premium :** {premium_status}
-
-👥 **Utilisateurs :**
-• Total : {total_users}
-• Premium : {premium_users}
-• Mensuels : {monthly_users}
-
-📈 **Aujourd'hui :**
-• 👥 Actifs : {today_users}
-• 💬 Messages : {today_messages}
-• 🪙 Tokens : {today_tokens:,}
-
-🪙 **Tokens Totaux :** {total_tokens:,}
-🔧 **Config :** {MAX_TOKENS} tokens • {TEMPERATURE} temp
-
-🕐 **MAJ :** {datetime.now().strftime('%H:%M %d/%m/%Y')}
-"""
-    send_legendary_photo(user_id, stats_text)
-
-def show_detailed_users(user_id):
-    users = get_all_users()
-    if not users:
-        bot.send_message(user_id, "📭 Aucun utilisateur enregistré.")
-        return
-    
-    response = "👥 **UTILISATEURS DÉTAILLÉS**\n\n"
-    for i, user in enumerate(users[:8], 1):
-        user_id, username, first_name, has_premium, referrals_count, message_count, total_tokens = user
-        premium_status = "⭐" if has_premium else "🔒"
-        username_display = f"@{username}" if username else "─"
-        
-        response += f"{i}. {premium_status} **{first_name}**\n"
-        response += f"   👤 {username_display} • 🆔 `{user_id}`\n"
-        response += f"   📊 {referrals_count} parrain • 💬 {message_count} msg • 🪙 {total_tokens:,} tkn\n"
-        response += "━━━━━━━━━━━━━━━━━━━━\n"
-    
-    if len(users) > 8:
-        response += f"\n... et {len(users) - 8} autres utilisateurs"
-    
-    send_legendary_photo(user_id, response)
-
-# ==================== MOTEUR IA AVANCÉ ====================
+# ==================== MOTEUR IA AVEC PERSONNALITÉS ====================
 def get_user_session(user_id):
     if user_id not in user_sessions:
         user_sessions[user_id] = {
             'conversation': [],
             'model_used': current_model,
-            'total_tokens': 0
+            'personality_used': get_user_personality(user_id),
+            'total_tokens': 0,
+            'last_interaction': datetime.now()
         }
     return user_sessions[user_id]
-
-def estimate_tokens(text):
-    return len(text.split()) * 1.3
 
 def advanced_ai_handler(user_id, user_message):
     if not AI_ENABLED:
@@ -492,30 +657,29 @@ def advanced_ai_handler(user_id, user_message):
         return "❌ **SERVICE IA INDISPONIBLE**\n\nConfiguration API manquante."
     
     user_session = get_user_session(user_id)
+    user_session['last_interaction'] = datetime.now()
     
-    # Préparation du contexte
-    system_prompt = f"""Tu es {BOT_NAME}, un assistant IA avancé créé par {CREATOR}.
+    # Récupérer la personnalité de l'utilisateur
+    personality_id = user_session['personality_used']
+    personality = AI_PERSONALITIES.get(personality_id, AI_PERSONALITIES['default'])
+    
+    # Préparation du contexte avec personnalité
+    system_prompt = f"""{personality['prompt']}
 
-🎯 **Ton rôle :**
-• Répondre de manière utile et naturelle
-• Adapter tes réponses au contexte
-• Être concis mais complet
-• Formater proprement les réponses
+🔧 **CONTEXTE TECHNIQUE :**
+Modèle : {current_model}
+Créeur : {CREATOR}
+Version : {VERSION}
+Personnalité : {personality['name']} {personality['emoji']}
 
-📝 **Instructions :**
-- Utilise des emojis pertinents
-- Structure tes réponses clairement
-- Sois créatif et engageant
-- Réponds en français sauf demande contraire
-
-🔧 **Modèle :** {current_model}
-"""
+💡 **ENJOY THE CONVERSATION !**"""
     
     messages = [{"role": "system", "content": system_prompt}]
     
-    # Ajouter l'historique de conversation (limité)
+    # Ajouter un contexte récent (limité à 4 derniers échanges)
     if user_session['conversation']:
-        messages.extend(user_session['conversation'][-6:])  # Garder les 6 derniers messages
+        recent_history = user_session['conversation'][-8:]  # 4 échanges
+        messages.extend(recent_history)
     
     messages.append({"role": "user", "content": user_message})
     
@@ -542,27 +706,43 @@ def advanced_ai_handler(user_id, user_message):
             tokens_used = result["usage"]["total_tokens"]
             
             # Mettre à jour la session
-            user_session['conversation'].append({"role": "user", "content": user_message[:300]})
-            user_session['conversation'].append({"role": "assistant", "content": ai_response[:500]})
+            user_session['conversation'].append({"role": "user", "content": user_message[:200]})
+            user_session['conversation'].append({"role": "assistant", "content": ai_response[:300]})
+            
+            # Garder seulement les 12 derniers messages (6 échanges)
+            if len(user_session['conversation']) > 12:
+                user_session['conversation'] = user_session['conversation'][-12:]
+            
             user_session['total_tokens'] += tokens_used
             user_session['model_used'] = current_model
             
             # Sauvegarder les stats
             update_user_stats(user_id, tokens_used)
-            save_conversation(user_id, user_message, ai_response, tokens_used, current_model)
+            save_conversation(user_id, user_message, ai_response, tokens_used, current_model, personality_id)
             
             return ai_response
             
         else:
-            return f"❌ **Erreur de service**\n\nCode: {response.status_code}\n\nRéessayez dans quelques instants."
+            error_msg = f"❌ **Erreur de service**\n\nCode: {response.status_code}"
+            if response.status_code == 429:
+                error_msg += "\n\n⚠️ **Limite de requêtes atteinte**\nRéessayez dans quelques minutes."
+            elif response.status_code == 401:
+                error_msg += "\n\n🔑 **Problème d'authentification**\nVérifiez la configuration API."
+            
+            return error_msg
             
     except requests.exceptions.Timeout:
         return "⏰ **Délai dépassé**\n\nLa requête a pris trop de temps. Réessayez."
+    except requests.exceptions.ConnectionError:
+        return "🌐 **Problème de connexion**\n\nVérifiez votre connexion internet."
     except Exception as e:
-        return f"🔧 **Erreur technique**\n\n{str(e)}\n\nRéessayez plus tard."
+        return f"🔧 **Erreur technique**\n\n{str(e)[:100]}\n\nRéessayez plus tard."
 
 def send_legendary_photo(chat_id, caption, reply_markup=None):
     try:
+        # Nettoyer le caption pour éviter les erreurs de formatage
+        caption = caption.replace('**', '*').replace('__', '_')[:1024]
+        
         bot.send_photo(
             chat_id,
             MAIN_PHOTO,
@@ -572,16 +752,20 @@ def send_legendary_photo(chat_id, caption, reply_markup=None):
         )
         return True
     except Exception as e:
-        bot.send_message(
-            chat_id,
-            caption,
-            parse_mode='Markdown',
-            reply_markup=reply_markup
-        )
-        return False
+        try:
+            bot.send_message(
+                chat_id,
+                caption,
+                parse_mode='Markdown',
+                reply_markup=reply_markup
+            )
+            return True
+        except Exception as e2:
+            print(f"❌ Erreur d'envoi: {e2}")
+            return False
 
-# ==================== HANDLERS PRINCIPAUX ====================
-@bot.message_handler(commands=['start'])
+# ==================== HANDLERS PRINCIPAUX AMÉLIORÉS ====================
+@bot.message_handler(commands=['start', 'help', 'personality'])
 def start_handler(message):
     try:
         user_id = message.from_user.id
@@ -598,10 +782,34 @@ def start_handler(message):
         register_user(user_id, username, first_name, referrer_id)
         update_user_stats(user_id)
         
+        # Gestion de la commande personality
+        if message.text.startswith('/personality'):
+            if check_premium_access(user_id):
+                user_personality = get_user_personality(user_id)
+                current_personality = AI_PERSONALITIES.get(user_personality, AI_PERSONALITIES['default'])
+                
+                caption = f"""
+🎭 **CHOISISSEZ VOTRE PERSONNALITÉ IA**
+
+Personnalité actuelle: 
+**{current_personality['emoji']} {current_personality['name']}**
+
+✨ **Personnalités disponibles:**
+• 🤖 **Standard** - Équilibre parfait
+• 🎨 **Créatif** - Imagination et originalité  
+• 💻 **Technique** - Précision et détails
+• 😊 **Ami** - Chaleureux et empathique
+
+Choisissez celle qui vous correspond le mieux !
+"""
+                send_legendary_photo(message.chat.id, caption, create_user_personality_menu(user_id))
+                return
+            else:
+                bot.reply_to(message, "❌ **Fonctionnalité Premium**\n\nCette fonctionnalité est réservée aux utilisateurs premium.")
+                return
+        
         if is_owner(user_id):
             activate_user_premium(user_id)
-            
-            # Récupérer les statistiques réelles
             stats = get_welcome_stats()
             
             caption = f"""
@@ -616,14 +824,7 @@ def start_handler(message):
 
 - **BIENVENUE PROPRIÉTAIRE !**  
 
-- Contrôles disponibles :  
-  • Activer/Désactiver l'IA  
-  • Gérer les premiums  
-  • Broadcast massif  
-  • Statistiques détaillées  
-
-- Utilisez les boutons ci-dessous !  
-  *{datetime.now().strftime('%I:%M %p')}*
+{create_live_dashboard()}
 """
             send_legendary_photo(message.chat.id, caption, create_owner_menu())
             return
@@ -632,23 +833,26 @@ def start_handler(message):
         stats = get_welcome_stats()
         
         if check_premium_access(user_id):
+            user_personality = get_user_personality(user_id)
+            personality = AI_PERSONALITIES.get(user_personality, AI_PERSONALITIES['default'])
+            
             caption = f"""
 # 🚀 NOVA-AI  
 **{stats['monthly_users']} utilisateurs mensuel**  
 
 - **Premium**  
-  **Activé**  
+  **Activé** ✅  
 
-- **KervensAI Pro**  
-  **Édition LÉGENDAIRE**  
+- **Personnalité**  
+  **{personality['emoji']} {personality['name']}**  
 
 🎉 **ACCÈS COMPLET DÉBLOQUÉ !**
 
 🚀 **Fonctionnalités premium :**
 • 💬 IA avancée illimitée
-• 🧠 Modèles optimisés
+• 🧠 Modèles optimisés  
+• 🎭 Personnalités multiples
 • 📊 Historique complet
-• 🎯 Réponses précises
 
 💡 **Envoyez n'importe quelle question !**
 """
@@ -661,7 +865,7 @@ def start_handler(message):
 **{stats['monthly_users']} utilisateurs mensuel**  
 
 - **Premium**  
-  **En attente**  
+  **En attente** 🔒  
 
 - **KervensAI Pro**  
   **Édition LÉGENDAIRE**  
@@ -672,14 +876,13 @@ def start_handler(message):
 
 📈 **Progression :** {referrals_count}/5 parrainages
 
-🔗 **Votre lien :** `{AFFILIATE_LINK}?start={user_id}`
-
-💡 **Partagez pour débloquer l'IA complète !**
+💡 **Partagez votre lien pour débloquer l'IA complète !**
 """
             send_legendary_photo(message.chat.id, caption, create_premium_menu(user_id))
             
     except Exception as e:
         print(f"❌ Erreur start: {e}")
+        bot.reply_to(message, "❌ Une erreur est survenue. Réessayez.")
 
 @bot.message_handler(func=lambda message: True)
 def message_handler(message):
@@ -687,7 +890,11 @@ def message_handler(message):
         return
         
     user_id = message.from_user.id
-    user_message = message.text
+    user_message = message.text.strip()
+    
+    # Ignorer les messages vides ou trop courts
+    if len(user_message) < 2:
+        return
     
     update_user_stats(user_id)
     
@@ -709,167 +916,235 @@ def message_handler(message):
     ai_response = advanced_ai_handler(user_id, user_message)
     bot.reply_to(message, ai_response)
 
-# ==================== GESTION DES CALLBACKS AVANCÉE ====================
+# ==================== GESTION DES CALLBACKS AMÉLIORÉE ====================
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     user_id = call.from_user.id
     
-    # Callbacks utilisateurs normaux
-    if call.data == "check_status":
-        referrals_count = get_user_referrals_count(user_id)
-        if check_premium_access(user_id):
-            bot.answer_callback_query(call.id, "✅ Premium activé - IA disponible !")
-        else:
-            bot.answer_callback_query(call.id, f"📊 {referrals_count}/5 parrainages")
-    
-    elif call.data == "activate_premium":
-        referrals_count = get_user_referrals_count(user_id)
-        if referrals_count >= 5:
-            activate_user_premium(user_id)
-            bot.answer_callback_query(call.id, "🎉 Premium activé !")
+    try:
+        # Callbacks utilisateurs normaux
+        if call.data == "check_status":
+            referrals_count = get_user_referrals_count(user_id)
+            if check_premium_access(user_id):
+                user_personality = get_user_personality(user_id)
+                personality = AI_PERSONALITIES.get(user_personality, AI_PERSONALITIES['default'])
+                bot.answer_callback_query(call.id, f"✅ Premium - {personality['emoji']} {personality['name']}")
+            else:
+                bot.answer_callback_query(call.id, f"📊 {referrals_count}/5 parrainages")
+        
+        elif call.data == "activate_premium":
+            referrals_count = get_user_referrals_count(user_id)
+            if referrals_count >= 5:
+                activate_user_premium(user_id)
+                bot.answer_callback_query(call.id, "🎉 Premium activé !")
+                stats = get_welcome_stats()
+                try:
+                    bot.edit_message_caption(
+                        chat_id=call.message.chat.id,
+                        message_id=call.message.message_id,
+                        caption=f"# 🚀 NOVA-AI  \n**{stats['monthly_users']} utilisateurs mensuel**  \n\n🎉 **PREMIUM ACTIVÉ !**  \n\n🚀 **Accès complet à l'IA débloqué !**",
+                        parse_mode='Markdown',
+                        reply_markup=create_main_menu()
+                    )
+                except:
+                    pass
+            else:
+                bot.answer_callback_query(call.id, f"❌ {5-referrals_count} parrainages manquants")
+        
+        elif call.data == "copy_link":
+            bot.answer_callback_query(call.id, "📋 Lien copié !")
+            bot.send_message(call.message.chat.id, 
+                            f"🔗 **Votre lien de parrainage :**\n\n`{AFFILIATE_LINK}?start={user_id}`\n\n📤 **Partagez-le pour débloquer le premium !**")
+        
+        # Gestion des personnalités utilisateur
+        elif call.data.startswith("user_personality_"):
+            if not check_premium_access(user_id):
+                bot.answer_callback_query(call.id, "❌ Fonctionnalité premium")
+                return
+                
+            personality_id = call.data.replace("user_personality_", "")
+            if personality_id in AI_PERSONALITIES:
+                set_user_personality(user_id, personality_id)
+                personality = AI_PERSONALITIES[personality_id]
+                bot.answer_callback_query(call.id, f"🎭 {personality['emoji']} {personality['name']}")
+                
+                # Mettre à jour la session utilisateur
+                if user_id in user_sessions:
+                    user_sessions[user_id]['personality_used'] = personality_id
+                
+                try:
+                    bot.edit_message_caption(
+                        chat_id=call.message.chat.id,
+                        message_id=call.message.message_id,
+                        caption=f"✅ **Personnalité mise à jour !**\n\nNouvelle personnalité: **{personality['emoji']} {personality['name']}**\n\nVos prochaines conversations utiliseront cette personnalité.",
+                        parse_mode='Markdown',
+                        reply_markup=create_user_personality_menu(user_id)
+                    )
+                except:
+                    pass
+        
+        elif call.data == "user_back":
             stats = get_welcome_stats()
-            try:
-                bot.edit_message_caption(
-                    chat_id=call.message.chat.id,
-                    message_id=call.message.message_id,
-                    caption=f"# 🚀 NOVA-AI  \n**{stats['monthly_users']} utilisateurs mensuel**  \n\n🎉 **PREMIUM ACTIVÉ !**  \n\n🚀 **Accès complet à l'IA débloqué !**",
-                    parse_mode='Markdown',
-                    reply_markup=create_main_menu()
-                )
-            except:
-                bot.send_message(call.message.chat.id, "🎉 **Premium activé avec succès !**")
-        else:
-            bot.answer_callback_query(call.id, f"❌ {5-referrals_count} parrainages manquants")
-    
-    elif call.data == "copy_link":
-        bot.answer_callback_query(call.id, "📋 Lien copié !")
-        bot.send_message(call.message.chat.id, 
-                        f"🔗 **Votre lien de parrainage :**\n\n`{AFFILIATE_LINK}?start={user_id}`\n\n📤 **Partagez-le pour débloquer le premium !**")
-    
-    # ==================== CALLBACKS ADMIN ====================
-    elif call.data.startswith("admin_"):
-        if not is_owner(user_id):
-            bot.answer_callback_query(call.id, "🔐 Accès réservé au propriétaire")
-            return
-        
-        if call.data == "admin_stats":
-            show_advanced_stats(user_id)
-            bot.answer_callback_query(call.id, "📊 Stats avancées")
-        
-        elif call.data == "admin_users":
-            show_detailed_users(user_id)
-            bot.answer_callback_query(call.id, "👥 Users détaillés")
-        
-        elif call.data == "admin_premium":
-            send_legendary_photo(
-                call.message.chat.id,
-                "⭐ **GESTION PREMIUM**\n\nGérez les accès premium :",
-                create_premium_management_menu()
-            )
-            bot.answer_callback_query(call.id, "⭐ Gestion premium")
-        
-        elif call.data == "admin_ai_control":
-            send_legendary_photo(
-                call.message.chat.id,
-                "🤖 **CONTRÔLE IA**\n\nParamètres de l'assistant IA :",
-                create_ai_control_menu()
-            )
-            bot.answer_callback_query(call.id, "🤖 Contrôle IA")
-        
-        elif call.data == "admin_models":
-            send_legendary_photo(
-                call.message.chat.id,
-                "🧠 **MODÈLES IA**\n\nChoisissez le modèle à utiliser :",
-                create_models_menu()
-            )
-            bot.answer_callback_query(call.id, "🧠 Modèles IA")
-        
-        elif call.data == "admin_settings":
-            # Implémentation des settings avancés
-            bot.answer_callback_query(call.id, "⚙️ Settings (bientôt)")
-        
-        elif call.data.startswith("admin_model_"):
-            new_model = call.data.replace("admin_model_", "")
-            if new_model in AI_MODELS:
-                save_settings(new_model=new_model)
-                bot.answer_callback_query(call.id, f"🧠 Modèle changé: {AI_MODELS[new_model]}")
-                send_legendary_photo(
-                    call.message.chat.id,
-                    f"✅ **MODÈLE MIS À JOUR**\n\nNouveau modèle : **{AI_MODELS[new_model]}**\n\n🧠 **{new_model}**",
-                    create_owner_menu()
-                )
-        
-        elif call.data == "admin_toggle_ai":
-            new_status = not AI_ENABLED
-            save_settings(ai_enabled=new_status)
-            status_text = "ACTIVÉE" if new_status else "DÉSACTIVÉE"
-            bot.answer_callback_query(call.id, f"🤖 IA {status_text}")
-            send_legendary_photo(
-                call.message.chat.id,
-                f"🤖 **IA {status_text}**\n\nL'assistant IA est maintenant **{status_text.lower()}**.",
-                create_ai_control_menu()
-            )
-        
-        elif call.data == "admin_toggle_premium":
-            new_status = not PREMIUM_REQUIRED
-            save_settings(premium_required=new_status)
-            status_text = "REQUIS" if new_status else "GRATUIT"
-            bot.answer_callback_query(call.id, f"⭐ Premium {status_text}")
-            send_legendary_photo(
-                call.message.chat.id,
-                f"⭐ **PREMIUM {status_text}**\n\nL'accès à l'IA est maintenant **{status_text.lower()}**.",
-                create_ai_control_menu()
-            )
-        
-        elif call.data == "admin_back":
-            stats = get_welcome_stats()
-            send_legendary_photo(
-                call.message.chat.id,
-                f"# 🚀 NOVA-AI  \n**{stats['monthly_users']} utilisateurs mensuel**  \n\n👑 **PANEL DE CONTRÔLE**  \n\nRetour au menu principal :",
-                create_owner_menu()
-            )
+            user_personality = get_user_personality(user_id)
+            personality = AI_PERSONALITIES.get(user_personality, AI_PERSONALITIES['default'])
+            
+            caption = f"""
+# 🚀 NOVA-AI  
+**{stats['monthly_users']} utilisateurs mensuel**  
+
+- **Premium**  
+  **Activé** ✅  
+
+- **Personnalité**  
+  **{personality['emoji']} {personality['name']}**  
+
+🎉 **ACCÈS COMPLET DÉBLOQUÉ !**
+
+Utilisez /personality pour changer de personnalité à tout moment !
+"""
+            send_legendary_photo(call.message.chat.id, caption, create_main_menu())
             bot.answer_callback_query(call.id, "🔙 Retour")
         
-        # Gestion premium (simplifiée)
-        elif call.data == "admin_give_premium":
-            msg = bot.send_message(call.message.chat.id, "🎁 **DONNER PREMIUM**\n\nEntrez l'ID utilisateur :")
-            bot.register_next_step_handler(msg, lambda m: process_give_premium(m))
-            bot.answer_callback_query(call.id, "🎁 Donner premium")
-        
-        elif call.data == "admin_premium_all":
-            users = get_all_users()
-            for user in users:
-                activate_user_premium(user[0])
-            bot.answer_callback_query(call.id, "⚡ Premium à tous")
-            bot.send_message(call.message.chat.id, f"✅ **Premium activé pour {len(users)} utilisateurs !**")
+        # ==================== CALLBACKS ADMIN ====================
+        elif call.data.startswith("admin_"):
+            if not is_owner(user_id):
+                bot.answer_callback_query(call.id, "🔐 Accès réservé")
+                return
+            
+            if call.data == "admin_dashboard":
+                caption = f"# 🚀 NOVA-AI - TABLEAU DE BORD\n\n{create_live_dashboard()}"
+                send_legendary_photo(call.message.chat.id, caption, create_owner_menu())
+                bot.answer_callback_query(call.id, "📊 Dashboard")
+            
+            elif call.data == "admin_users":
+                show_detailed_users(user_id)
+                bot.answer_callback_query(call.id, "👥 Utilisateurs")
+            
+            elif call.data == "admin_ai_control":
+                send_legendary_photo(
+                    call.message.chat.id,
+                    "🤖 **CONTRÔLE IA**\n\nParamètres de l'assistant IA :",
+                    create_ai_control_menu()
+                )
+                bot.answer_callback_query(call.id, "🤖 Contrôle IA")
+            
+            elif call.data == "admin_models":
+                send_legendary_photo(
+                    call.message.chat.id,
+                    "🧠 **MODÈLES IA**\n\nChoisissez le modèle à utiliser :",
+                    create_models_menu()
+                )
+                bot.answer_callback_query(call.id, "🧠 Modèles IA")
+            
+            elif call.data == "admin_personalities":
+                send_legendary_photo(
+                    call.message.chat.id,
+                    "🎭 **PERSONNALITÉS IA**\n\nPersonnalité globale du bot :",
+                    create_personality_menu()
+                )
+                bot.answer_callback_query(call.id, "🎭 Personnalités")
+            
+            elif call.data.startswith("admin_personality_"):
+                personality_id = call.data.replace("admin_personality_", "")
+                if personality_id in AI_PERSONALITIES:
+                    save_settings(new_personality=personality_id)
+                    personality = AI_PERSONALITIES[personality_id]
+                    bot.answer_callback_query(call.id, f"🎭 {personality['emoji']} {personality['name']}")
+                    send_legendary_photo(
+                        call.message.chat.id,
+                        f"✅ **PERSONNALITÉ GLOBALE MIS À JOUR**\n\nNouvelle personnalité: **{personality['emoji']} {personality['name']}**\n\nCette personnalité sera utilisée pour tous les nouveaux utilisateurs.",
+                        create_owner_menu()
+                    )
+            
+            elif call.data.startswith("admin_model_"):
+                new_model = call.data.replace("admin_model_", "")
+                if new_model in AI_MODELS:
+                    save_settings(new_model=new_model)
+                    bot.answer_callback_query(call.id, f"🧠 Modèle: {AI_MODELS[new_model]}")
+                    send_legendary_photo(
+                        call.message.chat.id,
+                        f"✅ **MODÈLE MIS À JOUR**\n\nNouveau modèle : **{AI_MODELS[new_model]}**",
+                        create_owner_menu()
+                    )
+            
+            elif call.data == "admin_toggle_ai":
+                new_status = not AI_ENABLED
+                save_settings(ai_enabled=new_status)
+                status_text = "ACTIVÉE" if new_status else "DÉSACTIVÉE"
+                bot.answer_callback_query(call.id, f"🤖 IA {status_text}")
+                send_legendary_photo(
+                    call.message.chat.id,
+                    f"🤖 **IA {status_text}**\n\nL'assistant IA est maintenant **{status_text.lower()}**.",
+                    create_ai_control_menu()
+                )
+            
+            elif call.data == "admin_toggle_premium":
+                new_status = not PREMIUM_REQUIRED
+                save_settings(premium_required=new_status)
+                status_text = "REQUIS" if new_status else "GRATUIT"
+                bot.answer_callback_query(call.id, f"⭐ Premium {status_text}")
+                send_legendary_photo(
+                    call.message.chat.id,
+                    f"⭐ **PREMIUM {status_text}**\n\nL'accès à l'IA est maintenant **{status_text.lower()}**.",
+                    create_ai_control_menu()
+                )
+            
+            elif call.data == "admin_back":
+                stats = get_welcome_stats()
+                send_legendary_photo(
+                    call.message.chat.id,
+                    f"# 🚀 NOVA-AI  \n**{stats['monthly_users']} utilisateurs mensuel**  \n\n👑 **PANEL ADMIN**\n\n{create_live_dashboard()}",
+                    create_owner_menu()
+                )
+                bot.answer_callback_query(call.id, "🔙 Retour")
+                
+    except Exception as e:
+        print(f"❌ Erreur callback: {e}")
+        bot.answer_callback_query(call.id, "❌ Erreur, réessayez")
 
-def process_give_premium(message):
-    user_id = message.from_user.id
-    if not is_owner(user_id):
+def show_detailed_users(user_id):
+    users = get_all_users()
+    if not users:
+        bot.send_message(user_id, "📭 Aucun utilisateur enregistré.")
         return
     
-    try:
-        target_user_id = int(message.text.strip())
-        activate_user_premium(target_user_id)
-        bot.send_message(message.chat.id, f"✅ **Premium donné à {target_user_id}**")
-    except ValueError:
-        bot.reply_to(message, "❌ ID utilisateur invalide")
+    response = "👥 **UTILISATEURS DÉTAILLÉS**\n\n"
+    for i, user in enumerate(users[:10], 1):
+        user_id, username, first_name, has_premium, referrals_count, message_count, total_tokens = user
+        premium_status = "⭐" if has_premium else "🔒"
+        username_display = f"@{username}" if username else "─"
+        
+        # Récupérer la personnalité de l'utilisateur
+        personality_id = get_user_personality(user_id)
+        personality = AI_PERSONALITIES.get(personality_id, AI_PERSONALITIES['default'])
+        
+        response += f"{i}. {premium_status} **{first_name}** {personality['emoji']}\n"
+        response += f"   👤 {username_display} • 🆔 `{user_id}`\n"
+        response += f"   📊 {referrals_count} réf • 💬 {message_count} msg\n\n"
+    
+    if len(users) > 10:
+        response += f"\n... et {len(users) - 10} autres utilisateurs"
+    
+    send_legendary_photo(user_id, response)
 
 # ==================== DÉMARRAGE ====================
 if __name__ == "__main__":
-    print("🗃️ Initialisation avancée...")
+    print("🗃️ Initialisation du système...")
     init_db()
     load_settings()
-    print("✅ Base prête")
+    print("✅ Base de données prête")
     print(f"🚀 {BOT_NAME} - {VERSION}")
     print(f"👑 Créateur: {CREATOR}")
     print("🎛️  SYSTÈME AVANCÉ ACTIVÉ")
     print(f"   👑 Propriétaire: {ADMIN_ID}")
     print(f"   🤖 IA: {'🟢 ACTIVÉE' if AI_ENABLED else '🔴 DÉSACTIVÉE'}")
     print(f"   🧠 Modèle: {current_model}")
+    print(f"   🎭 Personnalité: {AI_PERSONALITIES[current_personality]['name']}")
     print(f"   ⭐ Premium: {'🔒 REQUIS' if PREMIUM_REQUIRED else '🔓 GRATUIT'}")
-    print(f"   📏 Tokens: {MAX_TOKENS}")
-    print(f"   🌡️ Temperature: {TEMPERATURE}")
+    print("🎯 NOUVEAUTÉS:")
+    print("   • Système de personnalités IA")
+    print("   • Tableau de bord temps réel") 
+    print("   • Commandes utilisateur avancées")
     print("🤖 En attente de messages...")
     
     try:
