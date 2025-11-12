@@ -164,15 +164,21 @@ def init_db():
                   tokens_used INTEGER DEFAULT 0,
                   UNIQUE(user_id, activity_date))''')
     
-    c.execute('''CREATE TABLE IF NOT EXISTS ai_conversations
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  user_id INTEGER,
-                  user_message TEXT,
-                  ai_response TEXT,
-                  tokens_used INTEGER,
-                  model_used TEXT,
-                  personality_used TEXT,
-                  conversation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    # Table ai_conversations - reconstruction si nécessaire
+    try:
+        c.execute('SELECT personality_used FROM ai_conversations LIMIT 1')
+    except sqlite3.OperationalError:
+        # La table n'a pas la colonne personality_used, on la recrée
+        c.execute('DROP TABLE IF EXISTS ai_conversations')
+        c.execute('''CREATE TABLE IF NOT EXISTS ai_conversations
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                      user_id INTEGER,
+                      user_message TEXT,
+                      ai_response TEXT,
+                      tokens_used INTEGER,
+                      model_used TEXT,
+                      personality_used TEXT DEFAULT "default",
+                      conversation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
     
     c.execute('''CREATE TABLE IF NOT EXISTS user_preferences
                  (user_id INTEGER PRIMARY KEY,
@@ -316,10 +322,33 @@ def save_conversation(user_id, user_message, ai_response, tokens_used, model_use
     conn = sqlite3.connect('bot_groups.db')
     c = conn.cursor()
     
-    c.execute('''INSERT INTO ai_conversations 
-                 (user_id, user_message, ai_response, tokens_used, model_used, personality_used) 
-                 VALUES (?, ?, ?, ?, ?, ?)''',
-                 (user_id, user_message[:500], ai_response[:1000], tokens_used, model_used, personality_used))
+    # Vérifier si la table a la colonne personality_used
+    try:
+        c.execute('''INSERT INTO ai_conversations 
+                     (user_id, user_message, ai_response, tokens_used, model_used, personality_used) 
+                     VALUES (?, ?, ?, ?, ?, ?)''',
+                     (user_id, user_message[:500], ai_response[:1000], tokens_used, model_used, personality_used))
+    except sqlite3.OperationalError as e:
+        if "no such column: personality_used" in str(e):
+            # Recréer la table avec la colonne manquante
+            c.execute('DROP TABLE IF EXISTS ai_conversations')
+            c.execute('''CREATE TABLE IF NOT EXISTS ai_conversations
+                         (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                          user_id INTEGER,
+                          user_message TEXT,
+                          ai_response TEXT,
+                          tokens_used INTEGER,
+                          model_used TEXT,
+                          personality_used TEXT DEFAULT "default",
+                          conversation_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+            
+            # Réessayer l'insertion
+            c.execute('''INSERT INTO ai_conversations 
+                         (user_id, user_message, ai_response, tokens_used, model_used, personality_used) 
+                         VALUES (?, ?, ?, ?, ?, ?)''',
+                         (user_id, user_message[:500], ai_response[:1000], tokens_used, model_used, personality_used))
+        else:
+            raise e
     
     conn.commit()
     conn.close()
