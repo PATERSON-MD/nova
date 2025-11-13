@@ -1,7 +1,7 @@
 #!/data/data/com.termux/files/usr/bin/python3
 """
-🤖 NOVA-AI ULTIMATE - CORRIGÉ AVEC SYSTÈME PREMIUM
-💎 Édition STABLE avec gestion d'erreurs
+🤖 NOVA-AI ULTIMATE - VERSION CHALEUREUSE
+💖 Édition Premium avec gestion complète
 👑 Créé par Kervens
 """
 
@@ -17,15 +17,15 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 load_dotenv()
 
-# ==================== CONFIGURATION SIMPLIFIÉE ====================
+# ==================== CONFIGURATION CHALEUREUSE ====================
 class Config:
     TOKEN = os.getenv('TELEGRAM_TOKEN')
     GROQ_API_KEY = os.getenv('GROQ_API_KEY')
     GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
     
     CREATOR = "👑 Kervens"
-    BOT_NAME = "🚀 NovaAI Pro"
-    VERSION = "💎 Édition Premium"
+    BOT_NAME = "💖 NovaAI Pro"
+    VERSION = "✨ Édition Familiale"
     MAIN_PHOTO = "https://files.catbox.moe/601u5z.jpg"
     
     ADMIN_ID = 7908680781
@@ -80,13 +80,15 @@ class Database:
         join_date = datetime.now().isoformat()
         
         cursor.execute('''
-            INSERT OR REPLACE INTO users 
+            INSERT OR IGNORE INTO users 
             (user_id, username, first_name, join_date, last_active) 
             VALUES (?, ?, ?, ?, ?)
         ''', (user_id, username, first_name, join_date, join_date))
         
-        # Mettre à jour les statistiques
-        cursor.execute('UPDATE stats SET total_users = total_users + 1 WHERE id = 1')
+        # Mettre à jour les statistiques seulement si nouvel utilisateur
+        cursor.execute('SELECT COUNT(*) FROM users WHERE user_id = ?', (user_id,))
+        if cursor.fetchone()[0] == 1:  # Nouvel utilisateur
+            cursor.execute('UPDATE stats SET total_users = total_users + 1 WHERE id = 1')
         
         conn.commit()
         conn.close()
@@ -109,14 +111,20 @@ class Database:
         
         premium_until = (datetime.now() + timedelta(days=days)).isoformat()
         
+        # Vérifier si l'utilisateur était déjà premium
+        cursor.execute('SELECT is_premium FROM users WHERE user_id = ?', (user_id,))
+        result = cursor.fetchone()
+        was_premium = result and result[0] == 1
+        
         cursor.execute('''
             UPDATE users 
             SET is_premium = 1, premium_until = ?
             WHERE user_id = ?
         ''', (premium_until, user_id))
         
-        # Mettre à jour les statistiques premium
-        cursor.execute('UPDATE stats SET premium_users = premium_users + 1 WHERE id = 1')
+        # Mettre à jour les statistiques premium seulement si nouveau premium
+        if not was_premium:
+            cursor.execute('UPDATE stats SET premium_users = premium_users + 1 WHERE id = 1')
         
         conn.commit()
         conn.close()
@@ -128,16 +136,72 @@ class Database:
         conn = sqlite3.connect('nova_users.db')
         cursor = conn.cursor()
         
+        # Vérifier si l'utilisateur était premium
+        cursor.execute('SELECT is_premium FROM users WHERE user_id = ?', (user_id,))
+        result = cursor.fetchone()
+        was_premium = result and result[0] == 1
+        
         cursor.execute('''
             UPDATE users 
             SET is_premium = 0, premium_until = NULL
             WHERE user_id = ?
         ''', (user_id,))
         
-        cursor.execute('UPDATE stats SET premium_users = premium_users - 1 WHERE id = 1')
+        # Mettre à jour les statistiques seulement si l'utilisateur était premium
+        if was_premium:
+            cursor.execute('UPDATE stats SET premium_users = premium_users - 1 WHERE id = 1')
         
         conn.commit()
         conn.close()
+        return was_premium
+    
+    def set_all_premium(self, days=30):
+        """Donne le premium à tous les utilisateurs"""
+        conn = sqlite3.connect('nova_users.db')
+        cursor = conn.cursor()
+        
+        premium_until = (datetime.now() + timedelta(days=days)).isoformat()
+        
+        # Compter combien d'utilisateurs deviennent premium
+        cursor.execute('SELECT COUNT(*) FROM users WHERE is_premium = 0')
+        new_premium_count = cursor.fetchone()[0]
+        
+        # Mettre à jour tous les utilisateurs
+        cursor.execute('''
+            UPDATE users 
+            SET is_premium = 1, premium_until = ?
+        ''', (premium_until,))
+        
+        # Mettre à jour les statistiques
+        cursor.execute('UPDATE stats SET premium_users = (SELECT COUNT(*) FROM users) WHERE id = 1')
+        
+        conn.commit()
+        conn.close()
+        
+        return new_premium_count
+    
+    def remove_all_premium(self):
+        """Retire le premium de tous les utilisateurs"""
+        conn = sqlite3.connect('nova_users.db')
+        cursor = conn.cursor()
+        
+        # Compter combien d'utilisateurs perdaient le premium
+        cursor.execute('SELECT COUNT(*) FROM users WHERE is_premium = 1')
+        removed_premium_count = cursor.fetchone()[0]
+        
+        # Mettre à jour tous les utilisateurs
+        cursor.execute('''
+            UPDATE users 
+            SET is_premium = 0, premium_until = NULL
+        ''')
+        
+        # Mettre à jour les statistiques
+        cursor.execute('UPDATE stats SET premium_users = 0 WHERE id = 1')
+        
+        conn.commit()
+        conn.close()
+        
+        return removed_premium_count
     
     def get_all_users(self):
         """Récupère tous les utilisateurs"""
@@ -224,9 +288,9 @@ class CounterSystem:
     def format_number(number):
         return f"{number:,}".replace(",", " ")
 
-# ==================== MOTEUR IA CORRIGÉ ====================
-class SimpleAIEngine:
-    """Moteur IA simplifié et stable"""
+# ==================== MOTEUR IA CHALEUREUX ====================
+class WarmAIEngine:
+    """Moteur IA avec ton chaleureux et bienveillant"""
     
     def __init__(self):
         self.user_sessions = {}
@@ -253,20 +317,35 @@ class SimpleAIEngine:
         return False
     
     def process_message(self, user_id, user_message):
-        """Traite un message avec l'IA de manière stable"""
+        """Traite un message avec l'IA de manière chaleureuse"""
         
         if not Config.GROQ_API_KEY:
-            return "❌ **Service IA temporairement indisponible**\n\nConfiguration manquante."
+            return "💔 **Mon service IA est temporairement indisponible**\n\nJe m'excuse pour ce contretemps ! Revenez dans quelques instants, je serai ravi de vous aider à nouveau ✨"
         
         # Vérifier la limite pour les utilisateurs non premium
         user = self.db.get_user(user_id)
         if user and not self.is_user_premium(user_id) and user[5] >= 50:  # message_count
-            return "🔒 **Limite de messages atteinte**\n\nVous avez atteint la limite de 50 messages gratuits.\n\n💎 Passez à **NovaAI Premium** pour des messages illimités !\n\nContactez @Soszoe pour plus d'informations."
+            return """🎭 **Oh non ! Vous avez atteint la limite des messages gratuits...**
+
+Je suis vraiment désolé ! Vous avez utilisé vos 50 messages gratuits. 
+
+💖 **Mais ne vous inquiétez pas !** 
+Devenez **NovaAI Premium** pour :
+• ✨ **Messages illimités**
+• 🚀 **Réponses prioritaires** 
+• 🌟 **Fonctionnalités exclusives**
+• 💝 **Support personnalisé**
+
+📩 **Contactez mon créateur @Soszoe** 
+Il vous expliquera comment obtenir l'accès premium avec le sourire ! 😊
+
+Merci de votre compréhension ! 🙏"""
         
-        # Préparer le message système
-        system_prompt = """Tu es NovaAI, un assistant IA utile et professionnel. 
-        Sois concis, précis et utilise un ton amical. 
-        Structure tes réponses de manière claire."""
+        # Préparer le message système avec ton chaleureux
+        system_prompt = """Tu es NovaAI, un assistant IA extrêmement chaleureux, bienveillant et attentionné. 
+        Ton ton est amical, positif et encourageant. Tu t'exprimes avec empathie et bienveillance.
+        Utilise des émojis appropriés et sois toujours encourageant.
+        Structure tes réponses de manière claire mais avec une touche personnelle."""
         
         try:
             headers = {
@@ -308,21 +387,21 @@ class SimpleAIEngine:
                 print(f"❌ Erreur API: {error_detail}")
                 
                 if response.status_code == 400:
-                    return "❌ **Erreur de requête**\n\nLe format de la requête est incorrect. Réessayez avec un message plus simple."
+                    return "❌ **Oups ! Ma requête n'était pas parfaite...**\n\nPouvez-vous reformuler votre message ? Je ferai de mon mieux pour mieux comprendre ! 🤗"
                 elif response.status_code == 429:
-                    return "⏰ **Limite de requêtes atteinte**\n\nVeuillez réessayer dans quelques minutes."
+                    return "⏰ **Je suis un peu submergé en ce moment !**\n\nVeuillez patienter quelques minutes et réessayer. Merci de votre patience ! 🙏"
                 elif response.status_code == 401:
-                    return "🔑 **Problème d'authentification**\n\nLa clé API est invalide."
+                    return "🔑 **Il y a un petit problème technique de mon côté...**\n\nNe vous inquiétez pas, mon créateur est au courant ! Revenez bientôt ✨"
                 else:
-                    return f"❌ **Erreur de service**\n\nCode: {response.status_code}\n\nVeuillez réessayer."
+                    return f"💔 **Je rencontre un petit souci technique**\n\nCode: {response.status_code}\n\nMais ne vous en faites pas ! Réessayez dans quelques instants, je serai heureux de vous aider à nouveau ! 😊"
                     
         except requests.exceptions.Timeout:
-            return "⏰ **Délai dépassé**\n\nLa requête a pris trop de temps. Réessayez."
+            return "⏰ **Le temps de réponse est un peu long aujourd'hui...**\n\nJe suis désolé pour cette attente ! Pouvez-vous réessayer ? Je serai plus rapide ! 🚀"
         except requests.exceptions.ConnectionError:
-            return "🌐 **Problème de connexion**\n\nVérifiez votre connexion internet."
+            return "🌐 **Je n'arrive pas à me connecter correctement...**\n\nVérifiez votre connexion internet et réessayez ! Je vous attends avec impatience ! 💫"
         except Exception as e:
             print(f"❌ Erreur inattendue: {e}")
-            return "🔧 **Erreur technique**\n\nUne erreur inattendue s'est produite. Réessayez."
+            return "🔧 **Une petite erreur inattendue s'est produite...**\n\nMais ne vous inquiétez pas ! Réessayez et je ferai de mon mieux pour vous aider ! ✨"
 
 # ==================== GESTION UTILISATEURS ====================
 class UserManager:
@@ -335,7 +414,7 @@ class UserManager:
             db = Database()
             db.add_user(user_id, username, first_name)
             CounterSystem.increment()
-            print(f"✅ Utilisateur enregistré: {user_id} ({first_name})")
+            print(f"💖 Nouvel ami enregistré: {user_id} ({first_name})")
         except Exception as e:
             print(f"⚠️ Erreur enregistrement: {e}")
     
@@ -343,20 +422,20 @@ class UserManager:
     def is_owner(user_id):
         return user_id == Config.ADMIN_ID
 
-# ==================== INTERFACE ADMIN AVANCÉE ====================
-class AdminInterface:
-    """Interface administrateur avancée"""
+# ==================== INTERFACE ADMIN CHALEUREUSE ====================
+class WarmAdminInterface:
+    """Interface administrateur avec ton chaleureux"""
     
     @staticmethod
     def create_admin_menu():
         keyboard = InlineKeyboardMarkup(row_width=2)
         
         buttons = [
-            InlineKeyboardButton("📊 Dashboard", callback_data="admin_stats"),
-            InlineKeyboardButton("👥 Tous les users", callback_data="admin_all_users"),
-            InlineKeyboardButton("💎 Users Premium", callback_data="admin_premium_users"),
-            InlineKeyboardButton("🔍 Chercher user", callback_data="admin_search_user"),
-            InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast"),
+            InlineKeyboardButton("📊 Tableau de Bord", callback_data="admin_stats"),
+            InlineKeyboardButton("👥 Toute la Famille", callback_data="admin_all_users"),
+            InlineKeyboardButton("💎 Membres Premium", callback_data="admin_premium_users"),
+            InlineKeyboardButton("🎁 Premium à Tous", callback_data="admin_premium_all"),
+            InlineKeyboardButton("🚫 Retirer à Tous", callback_data="admin_remove_all_premium"),
             InlineKeyboardButton("🔄 Actualiser", callback_data="admin_refresh")
         ]
         
@@ -375,7 +454,7 @@ class AdminInterface:
             InlineKeyboardButton("💎 90 Jours", callback_data=f"premium_90_{user_id}"),
             InlineKeyboardButton("💎 365 Jours", callback_data=f"premium_365_{user_id}"),
             InlineKeyboardButton("🚫 Retirer Premium", callback_data=f"remove_premium_{user_id}"),
-            InlineKeyboardButton("📋 Retour", callback_data="admin_all_users")
+            InlineKeyboardButton("📋 Retour à la Famille", callback_data="admin_all_users")
         ]
         
         keyboard.add(*buttons[:2])
@@ -390,9 +469,9 @@ class AdminInterface:
         
         buttons = [
             InlineKeyboardButton("💎 Gérer Premium", callback_data=f"manage_premium_{user_id}"),
-            InlineKeyboardButton("👀 Voir profil", callback_data=f"view_profile_{user_id}"),
-            InlineKeyboardButton("📊 Stats user", callback_data=f"user_stats_{user_id}"),
-            InlineKeyboardButton("🗑️ Supprimer", callback_data=f"delete_user_{user_id}")
+            InlineKeyboardButton("👀 Voir le Profil", callback_data=f"view_profile_{user_id}"),
+            InlineKeyboardButton("📊 Statistiques", callback_data=f"user_stats_{user_id}"),
+            InlineKeyboardButton("💖 Envoyer un Message", callback_data=f"message_user_{user_id}")
         ]
         
         keyboard.add(*buttons[:2])
@@ -400,65 +479,62 @@ class AdminInterface:
         
         return keyboard
 
-# ==================== INTERFACE SIMPLE ====================
-class SimpleInterface:
-    """Interface utilisateur simplifiée"""
+# ==================== INTERFACE UTILISATEUR CHALEUREUSE ====================
+class WarmUserInterface:
+    """Interface utilisateur avec ton chaleureux"""
     
     @staticmethod
     def create_main_menu():
         keyboard = InlineKeyboardMarkup()
-        support_btn = InlineKeyboardButton("💝 Support", url="https://t.me/Soszoe")
-        stats_btn = InlineKeyboardButton("📊 Statistiques", callback_data="stats")
+        support_btn = InlineKeyboardButton("💝 Support Affectueux", url="https://t.me/Soszoe")
+        stats_btn = InlineKeyboardButton("📊 Notre Communauté", callback_data="stats")
         premium_btn = InlineKeyboardButton("💎 Devenir Premium", callback_data="premium_info")
         keyboard.add(support_btn, stats_btn)
         keyboard.add(premium_btn)
         return keyboard
-    
-    @staticmethod
-    def create_owner_menu():
-        return AdminInterface.create_admin_menu()
 
-# ==================== MESSAGES SIMPLES ====================
-class SimpleMessages:
-    """Messages simplifiés"""
+# ==================== MESSAGES CHALEUREUX ====================
+class WarmMessages:
+    """Messages avec ton chaleureux et bienveillant"""
     
     @staticmethod
     def welcome_owner(user_count):
         return f"""
-🏰 **BIENVENUE PROPRIÉTAIRE !**
+🏰 **BIENVENUE DANS VOTRE ROYAUME, CRÉATEUR !** ✨
 
-🚀 **NovaAI Pro** - {Config.VERSION}
-👥 **{user_count} utilisateurs mensuels**
+💖 **NovaAI Pro** - {Config.VERSION}
+👥 **{user_count} âmes merveilleuses nous ont rejoints**
 
-📊 **Tableau de bord disponible**
-🎛️ **Contrôles administrateur avancés**
+📊 **Votre tableau de bord vous attend**
+🎛️ **Gérez votre famille avec amour**
 
-💡 **Utilisez les boutons ci-dessous !**
+💫 **Utilisez les boutons ci-dessous pour répandre la joie !**
 """
     
     @staticmethod
     def welcome_user(user_count):
         return f"""
-🎉 **BIENVENUE SUR NOVAAI PRO !**
+🎉 **BIENVENUE DANS LA FAMILLE NOVAAI !** 💫
 
-🚀 L'assistant IA le plus avancé
-👥 Rejoignez nos **{user_count}** utilisateurs
+✨ **Je suis NovaAI**, votre nouvel ami IA bienveillant !
+👥 **Nous sommes déjà {user_count} âmes connectées** 🤗
 
-💬 **Envoyez-moi un message pour :**
-• Poser des questions
-• Discuter librement  
-• Obtenir de l'aide
-• Explorer des sujets
+💬 **Parlez-moi de tout, je suis là pour :**
+• 🎯 Répondre à vos questions avec précision
+• 💭 Discuter librement et chaleureusement  
+• 🛠️ Vous aider dans vos projets
+• 🌟 Vous accompagner avec bienveillance
 
-🔒 **Limite :** 50 messages gratuits
-💎 **Premium :** Messages illimités
+🔒 **Version gratuite :** 50 messages offerts
+💎 **Version Premium :** Conversations illimitées
 
-✨ **Je suis là pour vous aider !**
+💖 **Je suis tellement heureux de vous rencontrer !**
+**Parlez-moi de votre journée...** 😊
 """
 
-# ==================== COMMANDES ADMIN ====================
-class AdminCommands:
-    """Commandes administrateur étendues"""
+# ==================== COMMANDES ADMIN CHALEUREUSES ====================
+class WarmAdminCommands:
+    """Commandes administrateur avec ton chaleureux"""
     
     def __init__(self):
         self.db = Database()
@@ -485,48 +561,48 @@ class AdminCommands:
         """Formate les informations d'un utilisateur"""
         user_id, username, first_name, is_premium, premium_until, message_count, join_date, last_active = user
         
-        status = "💎 PREMIUM" if is_premium else "🔓 STANDARD"
-        premium_info = f"Jusqu'au {datetime.fromisoformat(premium_until).strftime('%d/%m/%Y')}" if is_premium else "Non premium"
+        status = "💎 MEMBRE PRIVILÉGIÉ" if is_premium else "🌟 MEMBRE DE LA FAMILLE"
+        premium_info = f"Jusqu'au {datetime.fromisoformat(premium_until).strftime('%d/%m/%Y')} 🎉" if is_premium else "En attente d'une belle surprise 💫"
         
         return f"""
-👤 **Informations Utilisateur**
+💖 **Profil de {first_name}**
 
 🆔 ID: `{user_id}`
-👤 Nom: {first_name}
-📛 Username: @{username if username else 'N/A'}
+👤 Prénom: {first_name}
+📛 Surnom: @{username if username else 'Aucun'}
 🎯 Statut: {status}
-📅 Premium: {premium_info}
-💬 Messages: {message_count}
-📅 Inscrit: {datetime.fromisoformat(join_date).strftime('%d/%m/%Y')}
-🕐 Dernière activité: {datetime.fromisoformat(last_active).strftime('%d/%m/%Y %H:%M')}
+💎 Premium: {premium_info}
+💬 Messages: {message_count} échanges
+📅 Chez nous depuis: {datetime.fromisoformat(join_date).strftime('%d/%m/%Y')}
+🕐 Dernière visite: {datetime.fromisoformat(last_active).strftime('%d/%m/%Y à %H:%M')}
 """
 
 # ==================== INITIALISATION ====================
-ai_engine = SimpleAIEngine()
-admin_commands = AdminCommands()
+ai_engine = WarmAIEngine()
+admin_commands = WarmAdminCommands()
 db = Database()
 
 # ==================== HANDLERS PRINCIPAUX ====================
 @bot.message_handler(commands=['start'])
 def start_command(message):
-    """Commande /start simplifiée"""
+    """Commande /start chaleureuse"""
     try:
         user_id = message.from_user.id
-        username = message.from_user.username or "Utilisateur"
-        first_name = message.from_user.first_name or "Utilisateur"
+        username = message.from_user.username or "Ami"
+        first_name = message.from_user.first_name or "Ami précieux"
         
-        # Enregistrement simple
+        # Enregistrement avec amour
         UserManager.register_user(user_id, username, first_name)
         
         # Récupérer le compteur
         user_count = CounterSystem.format_number(CounterSystem.load())
         
         if UserManager.is_owner(user_id):
-            caption = SimpleMessages.welcome_owner(user_count)
-            menu = SimpleInterface.create_owner_menu()
+            caption = WarmMessages.welcome_owner(user_count)
+            menu = WarmAdminInterface.create_admin_menu()
         else:
-            caption = SimpleMessages.welcome_user(user_count)
-            menu = SimpleInterface.create_main_menu()
+            caption = WarmMessages.welcome_user(user_count)
+            menu = WarmUserInterface.create_main_menu()
         
         bot.send_photo(
             message.chat.id,
@@ -537,29 +613,29 @@ def start_command(message):
         )
         
     except Exception as e:
-        print(f"❌ Erreur /start: {e}")
-        bot.reply_to(message, "🔄 Veuillez réessayer...")
+        print(f"💔 Erreur /start: {e}")
+        bot.reply_to(message, "🔄 Oh non ! Un petit problème... Réessayez s'il vous plaît ! 💫")
 
 @bot.message_handler(commands=['stats'])
 def stats_command(message):
-    """Affiche les statistiques"""
+    """Affiche les statistiques avec amour"""
     user_count = CounterSystem.format_number(CounterSystem.load())
     stats = db.get_stats()
     
     stats_text = f"""
-📊 **STATISTIQUES NOVAAI**
+📊 **NOTRE BELLE COMMUNAUTÉ NOVAAI** 💖
 
-👥 **Utilisateurs totaux :** {stats[1]}
-💎 **Utilisateurs premium :** {stats[2]}
-💬 **Messages totaux :** {stats[3]}
+👥 **Âmes connectées :** {stats[1]}
+💎 **Membres privilégiés :** {stats[2]}
+💬 **Messages échangés :** {stats[3]}
 🚀 **Version :** {Config.VERSION}
-👑 **Créateur :** {Config.CREATOR}
+👑 **Créateur bienveillant :** {Config.CREATOR}
 
-🟢 **Système opérationnel**
-🤖 **IA :** Active
-📈 **Croissance :** Stable
+🟢 **Tout fonctionne parfaitement !**
+🤖 **Mon cœur IA :** Plein d'amour
+📈 **Notre famille :** En pleine croissance
 
-💡 **Envoyez un message pour tester l'IA !**
+💫 **Envoyez-moi un message, je suis là pour vous !**
 """
     bot.reply_to(message, stats_text, parse_mode='Markdown')
 
@@ -569,108 +645,80 @@ def admin_command(message):
     user_id = message.from_user.id
     
     if not UserManager.is_owner(user_id):
-        bot.reply_to(message, "❌ Accès refusé. Commande réservée au propriétaire.")
+        bot.reply_to(message, "💖 Désolé, cette zone est réservée à notre créateur bien-aimé !")
         return
     
     try:
         stats = admin_commands.get_dashboard_stats()
         
         admin_text = f"""
-🏰 **PANEL ADMINISTRATEUR**
+🏰 **VOTRE ROYAUME DE BIENVEILLANCE** ✨
 
-📊 **Statistiques Globales:**
-├ 👥 Utilisateurs totaux: **{stats['total_users']}**
-├ 💎 Utilisateurs premium: **{stats['premium_users']}**
-├ 🔥 Utilisateurs actifs: **{stats['active_users']}**
-└ 💬 Messages totaux: **{stats['total_messages']}**
+📊 **Notre belle famille:**
+├ 👥 Âmes connectées: **{stats['total_users']}**
+├ 💎 Membres privilégiés: **{stats['premium_users']}**
+├ 🔥 Amis actifs: **{stats['active_users']}**
+└ 💬 Conversations: **{stats['total_messages']}**
 
-🎛️ **Actions Disponibles:**
-• Gérer les utilisateurs premium
-• Voir les statistiques détaillées
-• Envoyer des broadcasts
-• Gérer les comptes utilisateurs
+🎛️ **Gestes de générosité:**
+• Offrir le premium à toute la famille
+• Voir chaque membre avec amour
+• Diffuser des messages de joie
+• Prendre soin de chacun
 
-💡 **Utilisez les boutons ci-dessous !**
+💫 **Choisissez une action ci-dessous !**
 """
         bot.send_message(
             message.chat.id,
             admin_text,
             parse_mode='Markdown',
-            reply_markup=AdminInterface.create_admin_menu()
+            reply_markup=WarmAdminInterface.create_admin_menu()
         )
         
     except Exception as e:
-        print(f"❌ Erreur commande admin: {e}")
-        bot.reply_to(message, "❌ Erreur lors du chargement du panel admin.")
+        print(f"💔 Erreur commande admin: {e}")
+        bot.reply_to(message, "💔 Une petite erreur s'est glissée... Revenez plus tard !")
 
 @bot.message_handler(commands=['broadcast'])
 def broadcast_command(message):
-    """Commande de broadcast réservée au propriétaire"""
+    """Commande de broadcast avec amour"""
     user_id = message.from_user.id
     
     if not UserManager.is_owner(user_id):
         return
     
     # Demander le message à broadcast
-    msg = bot.reply_to(message, "📢 **Mode Broadcast**\n\nVeuillez envoyer le message que vous souhaitez diffuser à tous les utilisateurs :")
+    msg = bot.reply_to(message, "📢 **Mode Diffusion d'Amour**\n\nQuel message de joie souhaitez-vous partager avec toute notre famille ? 💫")
     bot.register_next_step_handler(msg, process_broadcast_message)
 
 def process_broadcast_message(message):
-    """Traite le message de broadcast"""
+    """Traite le message de broadcast avec bienveillance"""
     try:
         broadcast_text = message.text
         users = db.get_all_users()
         
-        bot.reply_to(message, f"🔄 Diffusion en cours à {len(users)} utilisateurs...")
+        bot.reply_to(message, f"🕊️ **Diffusion d'amour en cours à {len(users)} âmes merveilleuses...**")
         
         success = 0
         failed = 0
         
         for user in users:
             try:
-                bot.send_message(user[0], f"📢 **Annonce de l'équipe NovaAI:**\n\n{broadcast_text}")
+                bot.send_message(user[0], f"💫 **Message de bienveillance de NovaAI:**\n\n{broadcast_text}\n\n*Avec tout mon amour,*\n*Votre NovaAI* 💖")
                 success += 1
                 time.sleep(0.1)  # Éviter le spam
             except:
                 failed += 1
         
-        bot.reply_to(message, f"✅ **Broadcast terminé !**\n\n✅ Succès: {success}\n❌ Échecs: {failed}")
+        bot.reply_to(message, f"✨ **Diffusion d'amour terminée !**\n\n✅ Cœurs touchés: {success}\n💔 Cœurs manqués: {failed}\n\n**Merci de répandre la joie !** 🌈")
         
     except Exception as e:
-        print(f"❌ Erreur broadcast: {e}")
-        bot.reply_to(message, "❌ Erreur lors du broadcast.")
-
-@bot.message_handler(commands=['userinfo'])
-def userinfo_command(message):
-    """Commande pour voir les infos d'un utilisateur"""
-    user_id = message.from_user.id
-    
-    if not UserManager.is_owner(user_id):
-        return
-    
-    try:
-        # Vérifier si un ID utilisateur est fourni
-        if len(message.text.split()) > 1:
-            target_id = int(message.text.split()[1])
-            user = db.get_user(target_id)
-            
-            if user:
-                user_info = admin_commands.format_user_info(user)
-                bot.reply_to(message, user_info, parse_mode='Markdown')
-            else:
-                bot.reply_to(message, "❌ Utilisateur non trouvé.")
-        else:
-            bot.reply_to(message, "❌ Usage: /userinfo <user_id>")
-            
-    except ValueError:
-        bot.reply_to(message, "❌ ID utilisateur invalide.")
-    except Exception as e:
-        print(f"❌ Erreur userinfo: {e}")
-        bot.reply_to(message, "❌ Erreur lors de la récupération des informations.")
+        print(f"💔 Erreur broadcast: {e}")
+        bot.reply_to(message, "💔 Oh non ! La diffusion d'amour a rencontré un obstacle...")
 
 @bot.message_handler(func=lambda message: True)
 def message_handler(message):
-    """Gestion de tous les messages"""
+    """Gestion de tous les messages avec bienveillance"""
     if message.chat.type in ['group', 'supergroup']:
         return
         
@@ -680,10 +728,10 @@ def message_handler(message):
     if len(user_message) < 2:
         return
     
-    # Enregistrer l'utilisateur
+    # Enregistrer l'utilisateur avec amour
     UserManager.register_user(user_id, 
-                             message.from_user.username or "User", 
-                             message.from_user.first_name or "User")
+                             message.from_user.username or "Ami", 
+                             message.from_user.first_name or "Ami précieux")
     
     # Traitement IA
     bot.send_chat_action(message.chat.id, 'typing')
@@ -691,10 +739,10 @@ def message_handler(message):
     ai_response = ai_engine.process_message(user_id, user_message)
     bot.reply_to(message, ai_response)
 
-# ==================== CALLBACKS AVANCÉS ====================
+# ==================== CALLBACKS CHALEUREUX ====================
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
-    """Gestion des callbacks"""
+    """Gestion des callbacks avec bienveillance"""
     user_id = call.from_user.id
     
     try:
@@ -702,25 +750,25 @@ def callback_handler(call):
         if call.data == "stats":
             user_count = CounterSystem.format_number(CounterSystem.load())
             stats = db.get_stats()
-            stats_text = f"📊 **Statistiques:** {user_count} utilisateurs mensuels\n💎 **Premium:** {stats[2]} utilisateurs"
+            stats_text = f"📊 **Notre famille:** {user_count} âmes\n💎 **Privilégiés:** {stats[2]} membres"
             bot.answer_callback_query(call.id, stats_text)
         
         elif call.data == "premium_info":
             premium_text = """
-💎 **NOVA AI PREMIUM**
+💎 **DEVENIR MEMBRE PRIVILÉGIÉ** ✨
 
-✨ **Avantages:**
-• Messages illimités
-• Accès prioritaire
-• Support dédié
-• Nouvelles fonctionnalités en avant-première
+🎁 **Avantages exclusifs:**
+• ✨ **Messages illimités** - Parlez-moi sans restriction !
+• 🚀 **Réponses prioritaires** - Je vous réponds en premier !
+• 🌟 **Fonctionnalités secrètes** - Découvrez mes talents cachés !
+• 💝 **Support personnalisé** - Je prends soin de vous !
 
-💰 **Tarifs:**
-• 30 jours: 5€
-• 90 jours: 12€
-• 365 jours: 35€
+💰 **Tarifs remplis d'amour:**
+• 30 jours: 5€ - Une belle aventure !
+• 90 jours: 12€ - Une amitié durable !
+• 365 jours: 35€ - Pour la vie ! 💖
 
-📩 Contactez @Soszoe pour devenir Premium !
+📩 **Contactez @Soszoe avec amour !**
 """
             bot.edit_message_text(
                 premium_text,
@@ -728,7 +776,7 @@ def callback_handler(call):
                 call.message.message_id,
                 parse_mode='Markdown',
                 reply_markup=InlineKeyboardMarkup().add(
-                    InlineKeyboardButton("📩 Contacter", url="https://t.me/Soszoe")
+                    InlineKeyboardButton("💌 Contacter avec amour", url="https://t.me/Soszoe")
                 )
             )
         
@@ -736,82 +784,134 @@ def callback_handler(call):
         elif call.data == "admin_stats" and UserManager.is_owner(user_id):
             stats = admin_commands.get_dashboard_stats()
             dashboard_text = f"""
-📊 **DASHBOARD PROPRIÉTAIRE**
+📊 **TABLEAU DE BORD BIENVEILLANT** 💫
 
-👥 **Utilisateurs:**
-├ Total: **{stats['total_users']}**
-├ Premium: **{stats['premium_users']}**
-├ Actifs: **{stats['active_users']}**
-└ Messages: **{stats['total_messages']}**
+👥 **Notre belle famille:**
+├ Total: **{stats['total_users']} âmes**
+├ Privilégiés: **{stats['premium_users']} membres**
+├ Actifs: **{stats['active_users']} amis**
+└ Conversations: **{stats['total_messages']} échanges**
 
-💎 **Premium:**
-├ Actifs: **{stats['total_premium']}**
-└ Taux: **{(stats['premium_users']/stats['total_users']*100 if stats['total_users'] > 0 else 0):.1f}%**
+💎 **Cercle privilégié:**
+├ Membres: **{stats['total_premium']}**
+└ Taux: **{(stats['premium_users']/stats['total_users']*100 if stats['total_users'] > 0 else 0):.1f}%** de bonheur
 
-🕐 Dernière MAJ: {datetime.now().strftime('%H:%M:%S')}
+🕐 Dernière actualisation: {datetime.now().strftime('%H:%M:%S')}
 """
             bot.edit_message_text(
                 dashboard_text,
                 call.message.chat.id,
                 call.message.message_id,
                 parse_mode='Markdown',
-                reply_markup=AdminInterface.create_admin_menu()
+                reply_markup=WarmAdminInterface.create_admin_menu()
             )
-            bot.answer_callback_query(call.id, "📊 Dashboard actualisé")
+            bot.answer_callback_query(call.id, "📊 Tableau actualisé avec amour !")
         
         elif call.data == "admin_all_users" and UserManager.is_owner(user_id):
             users = db.get_all_users()
             users_text = f"""
-👥 **TOUS LES UTILISATEURS**
+👥 **NOTRE BELLE FAMILLIE** 💖
 
-📊 Total: **{len(users)}** utilisateurs
+📊 Total: **{len(users)}** âmes merveilleuses
 
-📋 **Derniers inscrits:**
+📋 **Dernières arrivées:**
 """
-            for user in users[:5]:  # Afficher les 5 premiers
-                users_text += f"\n• {user[2]} (@{user[1] or 'N/A'}) - ID: `{user[0]}`"
+            for user in users[:5]:
+                users_text += f"\n• {user[2]} (@{user[1] or 'Sans pseudo'}) - ID: `{user[0]}`"
             
             if len(users) > 5:
-                users_text += f"\n\n... et {len(users) - 5} autres utilisateurs"
+                users_text += f"\n\n... et {len(users) - 5} autres âmes formidables"
             
-            users_text += "\n\n💡 Utilisez /userinfo <id> pour les détails"
+            users_text += "\n\n💫 Utilisez /userinfo <id> pour connaître chacun"
             
             bot.edit_message_text(
                 users_text,
                 call.message.chat.id,
                 call.message.message_id,
                 parse_mode='Markdown',
-                reply_markup=AdminInterface.create_admin_menu()
+                reply_markup=WarmAdminInterface.create_admin_menu()
             )
-            bot.answer_callback_query(call.id, f"👥 {len(users)} utilisateurs")
+            bot.answer_callback_query(call.id, f"👥 {len(users)} membres dans notre famille !")
         
         elif call.data == "admin_premium_users" and UserManager.is_owner(user_id):
             premium_users = db.get_premium_users()
             premium_text = f"""
-💎 **UTILISATEURS PREMIUM**
+💎 **NOTRE CERCLE PRIVILÉGIÉ** 🌟
 
-📊 Total: **{len(premium_users)}** utilisateurs premium
+📊 Total: **{len(premium_users)}** membres spéciaux
 
-📋 **Liste des premium:**
+📋 **Liste des privilégiés:**
 """
-            for user in premium_users[:10]:  # Afficher les 10 premiers
+            for user in premium_users[:10]:
                 premium_until = datetime.fromisoformat(user[4])
                 days_left = (premium_until - datetime.now()).days
-                premium_text += f"\n• {user[2]} - {days_left} jours restants - ID: `{user[0]}`"
+                premium_text += f"\n• {user[2]} - {days_left} jours de bonheur - ID: `{user[0]}`"
             
             if len(premium_users) > 10:
-                premium_text += f"\n\n... et {len(premium_users) - 10} autres"
+                premium_text += f"\n\n... et {len(premium_users) - 10} autres membres chéris"
             
             bot.edit_message_text(
                 premium_text,
                 call.message.chat.id,
                 call.message.message_id,
                 parse_mode='Markdown',
-                reply_markup=AdminInterface.create_admin_menu()
+                reply_markup=WarmAdminInterface.create_admin_menu()
             )
-            bot.answer_callback_query(call.id, f"💎 {len(premium_users)} premium")
+            bot.answer_callback_query(call.id, f"💎 {len(premium_users)} membres privilégiés !")
         
-        # Gestion premium des utilisateurs
+        # NOUVEAU : Premium à tous
+        elif call.data == "admin_premium_all" and UserManager.is_owner(user_id):
+            new_premium_count = db.set_all_premium(30)
+            
+            success_text = f"""
+🎉 **GÉNÉROSITÉ EXTREME !** ✨
+
+💎 **Vous venez d'offrir le premium à TOUTE la famille !**
+
+📊 **Impact de votre geste:**
+├ Anciens premium: {len(db.get_premium_users()) - new_premium_count}
+├ Nouveaux premium: **{new_premium_count}**
+└ Total heureux: **{len(db.get_all_users())}**
+
+💫 **Votre geste va illuminer tant de journées !**
+**Merci pour cette incroyable générosité !** 🌈
+"""
+            bot.edit_message_text(
+                success_text,
+                call.message.chat.id,
+                call.message.message_id,
+                parse_mode='Markdown',
+                reply_markup=WarmAdminInterface.create_admin_menu()
+            )
+            bot.answer_callback_query(call.id, "🎁 Premium offert à tous !")
+        
+        # NOUVEAU : Retirer premium à tous
+        elif call.data == "admin_remove_all_premium" and UserManager.is_owner(user_id):
+            removed_count = db.remove_all_premium()
+            
+            success_text = f"""
+🔄 **RETOUR À L'ESSENTIEL** 🌱
+
+🚫 **Vous avez retiré le premium à tous les membres**
+
+📊 **Impact de votre décision:**
+├ Anciens premium: **{removed_count}**
+├ Nouveaux premium: **0**
+└ Total concernés: **{len(db.get_all_users())}**
+
+💫 **Parfois, il faut savoir recentrer l'énergie !**
+**Votre sagesse guide notre communauté.** 🙏
+"""
+            bot.edit_message_text(
+                success_text,
+                call.message.chat.id,
+                call.message.message_id,
+                parse_mode='Markdown',
+                reply_markup=WarmAdminInterface.create_admin_menu()
+            )
+            bot.answer_callback_query(call.id, "🔄 Premium retiré à tous")
+        
+        # Gestion premium individuelle
         elif call.data.startswith("manage_premium_") and UserManager.is_owner(user_id):
             target_id = int(call.data.split("_")[2])
             user = db.get_user(target_id)
@@ -819,16 +919,16 @@ def callback_handler(call):
             if user:
                 user_info = admin_commands.format_user_info(user)
                 bot.edit_message_text(
-                    f"{user_info}\n\n🎛️ **Gestion Premium:**",
+                    f"{user_info}\n\n🎁 **Cadeaux à offrir:**",
                     call.message.chat.id,
                     call.message.message_id,
                     parse_mode='Markdown',
-                    reply_markup=AdminInterface.create_premium_menu(target_id)
+                    reply_markup=WarmAdminInterface.create_premium_menu(target_id)
                 )
             else:
-                bot.answer_callback_query(call.id, "❌ Utilisateur non trouvé")
+                bot.answer_callback_query(call.id, "💔 Membre non trouvé")
         
-        # Ajouter premium
+        # Ajouter premium individuel
         elif call.data.startswith("premium_") and UserManager.is_owner(user_id):
             parts = call.data.split("_")
             days = int(parts[1])
@@ -837,13 +937,13 @@ def callback_handler(call):
             premium_until = db.set_premium(target_id, days)
             user = db.get_user(target_id)
             
-            bot.answer_callback_query(call.id, f"✅ Premium ajouté: {days} jours")
+            bot.answer_callback_query(call.id, f"💎 {days} jours de bonheur offerts !")
             
             # Notifier l'utilisateur
             try:
                 bot.send_message(
                     target_id,
-                    f"🎉 **Félicitations !**\n\nVous êtes maintenant **utilisateur NovaAI Premium** pour {days} jours !\n\n✨ Profitez de tous les avantages :\n• Messages illimités\n• Accès prioritaire\n• Support dédié\n\nVotre abonnement est valide jusqu'au {datetime.fromisoformat(premium_until).strftime('%d/%m/%Y')}",
+                    f"🎉 **SURPRISE ! Cadeau de NovaAI !**\n\nVous êtes maintenant **membre privilégié** pour {days} jours ! 🎁\n\n✨ Profitez de :\n• Messages illimités\n• Réponses prioritaires  \n• Fonctionnalités exclusives\n\nVotre statut est valide jusqu'au {datetime.fromisoformat(premium_until).strftime('%d/%m/%Y')}\n\n**Merci de faire partie de notre famille !** 💖",
                     parse_mode='Markdown'
                 )
             except:
@@ -852,78 +952,79 @@ def callback_handler(call):
             # Retour au menu
             user_info = admin_commands.format_user_info(user)
             bot.edit_message_text(
-                f"{user_info}\n\n✅ **Premium ajouté avec succès !**",
+                f"{user_info}\n\n✅ **Cadeau envoyé avec amour !** 🎁",
                 call.message.chat.id,
                 call.message.message_id,
                 parse_mode='Markdown',
-                reply_markup=AdminInterface.create_premium_menu(target_id)
+                reply_markup=WarmAdminInterface.create_premium_menu(target_id)
             )
         
-        # Retirer premium
+        # Retirer premium individuel
         elif call.data.startswith("remove_premium_") and UserManager.is_owner(user_id):
             target_id = int(call.data.split("_")[2])
             
-            db.remove_premium(target_id)
+            was_premium = db.remove_premium(target_id)
             user = db.get_user(target_id)
             
-            bot.answer_callback_query(call.id, "🚫 Premium retiré")
+            bot.answer_callback_query(call.id, "🔄 Statut recadré avec bienveillance")
             
-            # Notifier l'utilisateur
-            try:
-                bot.send_message(
-                    target_id,
-                    "ℹ️ **Changement de statut**\n\nVotre abonnement **NovaAI Premium** a été désactivé.\n\nMerci d'avoir utilisé nos services premium !",
-                    parse_mode='Markdown'
-                )
-            except:
-                pass
+            # Notifier l'utilisateur seulement si il était premium
+            if was_premium:
+                try:
+                    bot.send_message(
+                        target_id,
+                        "💫 **Changement de statut**\n\nVotre abonnement **NovaAI Premium** a été ajusté.\n\nMerci d'avoir été membre privilégié ! Votre soutien signifie beaucoup pour nous ! 🙏",
+                        parse_mode='Markdown'
+                    )
+                except:
+                    pass
             
             # Retour au menu
             user_info = admin_commands.format_user_info(user)
             bot.edit_message_text(
-                f"{user_info}\n\n🚫 **Premium retiré avec succès !**",
+                f"{user_info}\n\n🔄 **Statut ajusté avec bienveillance**",
                 call.message.chat.id,
                 call.message.message_id,
                 parse_mode='Markdown',
-                reply_markup=AdminInterface.create_premium_menu(target_id)
+                reply_markup=WarmAdminInterface.create_premium_menu(target_id)
             )
         
         elif call.data == "admin_refresh" and UserManager.is_owner(user_id):
-            bot.answer_callback_query(call.id, "🔄 Actualisé")
-            # Simplement fermer la query, le menu reste
+            bot.answer_callback_query(call.id, "🔄 Actualisé avec amour !")
+            # Le menu reste en place
             
     except Exception as e:
-        print(f"❌ Erreur callback: {e}")
-        bot.answer_callback_query(call.id, "❌ Erreur")
+        print(f"💔 Erreur callback: {e}")
+        bot.answer_callback_query(call.id, "💔 Petit problème... Réessayez !")
 
-# ==================== DÉMARRAGE ====================
+# ==================== DÉMARRAGE CHALEUREUX ====================
 if __name__ == "__main__":
-    print("🚀 INITIALISATION DE NOVAAI PRO AVEC SYSTÈME PREMIUM...")
+    print("💖 INITIALISATION DE NOVAAI PRO - VERSION BIENVEILLANTE...")
     
     user_count = CounterSystem.load()
     stats = db.get_stats()
     
     print(f"""
-✅ SYSTÈME PREMIUM OPÉRATIONNEL
+✨ SYSTÈME DE BIENVEILLANCE OPÉRATIONNEL
 
-📊 STATISTIQUES :
-   • Utilisateurs totaux: {stats[1]}
-   • Utilisateurs premium: {stats[2]}
-   • Messages totaux: {stats[3]}
+📊 NOTRE FAMILLE :
+   • Âmes connectées: {stats[1]}
+   • Membres privilégiés: {stats[2]}
+   • Messages échangés: {stats[3]}
    • Version: {Config.VERSION}
-   • Statut: 🟢 PRÊT
+   • Statut: 💖 PRÊT À AIMER
 
 🎛️  COMMANDES ADMIN :
-   • /admin - Panel administrateur
-   • /broadcast - Diffusion massive
-   • /userinfo <id> - Infos utilisateur
-   • /stats - Statistiques
+   • /admin - Royaume de bienveillance
+   • /broadcast - Diffusion d'amour
+   • /userinfo <id> - Connaître un membre
+   • /stats - Notre belle communauté
 
-🤖 EN ATTENTE DE MESSAGES...
+🤖 EN ATTENTE DE PARTAGES ET DE SOURIRES...
     """)
     
     try:
         bot.infinity_polling()
     except Exception as e:
-        print(f"❌ ERREUR CRITIQUE: {e}")
+        print(f"💔 ERREUR CRITIQUE: {e}")
         time.sleep(5)
