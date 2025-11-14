@@ -1,7 +1,7 @@
 #!/data/data/com.termux/files/usr/bin/python3
 """
 🤖 NOVA-AI ULTIMATE - MULTI-PERSONNALITÉS AVEC VOICE
-💖 Édition avec Voice Messages et Photos
+💖 Édition avec Voice Messages Générés
 👑 Créé par Kervens
 """
 
@@ -26,8 +26,7 @@ class Config:
     
     CREATOR = "👑 Kervens"
     BOT_NAME = "🎭 NovaAI Multi-Personnalités"
-    VERSION = "✨ Édition Voice & Photos"
-    MAIN_PHOTO = "https://files.catbox.moe/601u5z.jpg"
+    VERSION = "✨ Édition Voice Générés"
     
     ADMIN_ID = 7908680781
     
@@ -38,13 +37,6 @@ class Config:
         "hacker": "https://files.catbox.moe/ndj85q.jpg"
     }
     
-    # Voice message pour chaque personnalité
-    VOICE_MESSAGES = {
-        "amour": "https://files.catbox.moe/h68fij.m4a",
-        "mysterieux": "https://files.catbox.moe/h68fij.m4a",
-        "hacker": "https://files.catbox.moe/h68fij.m4a"
-    }
-    
     # Personnalités disponibles
     PERSONALITIES = {
         "amour": {
@@ -52,37 +44,36 @@ class Config:
             "emoji": "💖",
             "color": "rose",
             "photo": "https://files.catbox.moe/tta6ta.jpg",
-            "voice": "https://files.catbox.moe/h68fij.m4a"
+            "voice_text": "💖 Bonjour mon ami ! Je suis NovaAI dans ma personnalité amoureuse. Mon cœur bat pour vous écouter avec bienveillance et tendresse. Parlez-moi de tout, je suis là pour vous !"
         },
         "mysterieux": {
             "name": "🔮 NovaAI Mystérieux", 
             "emoji": "🔮",
             "color": "violet",
             "photo": "https://files.catbox.moe/e9wjbf.jpg",
-            "voice": "https://files.catbox.moe/h68fij.m4a"
+            "voice_text": "🔮 Bienvenue dans le sanctuaire des mystères... Je suis NovaAI l'énigmatique. Les étoiles murmurent vos secrets... Quel mystère souhaitez-vous percer aujourd'hui ?"
         },
         "hacker": {
             "name": "💻 NovaAI Hacker",
             "emoji": "💻",
             "color": "vert",
             "photo": "https://files.catbox.moe/ndj85q.jpg",
-            "voice": "https://files.catbox.moe/h68fij.m4a"
+            "voice_text": "💻 Système NovaAI en mode hacker. Connexion établie. Authentification validée. Prêt à recevoir vos commandes. Entrez votre requête..."
         }
     }
 
 bot = telebot.TeleBot(Config.TOKEN)
 
-# ==================== SYSTÈME DE BASE DE DONNÉES CORRIGÉ ====================
+# ==================== SYSTÈME DE BASE DE DONNÉES ====================
 class Database:
     def __init__(self):
         self.init_db()
     
     def init_db(self):
-        """Initialise la base de données avec vérification des colonnes"""
+        """Initialise la base de données"""
         conn = sqlite3.connect('nova_users.db')
         cursor = conn.cursor()
         
-        # Vérifier si la table users existe et a les bonnes colonnes
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
@@ -97,14 +88,6 @@ class Database:
             )
         ''')
         
-        # Vérifier et ajouter la colonne personality si elle n'existe pas
-        try:
-            cursor.execute("SELECT personality FROM users LIMIT 1")
-        except sqlite3.OperationalError:
-            print("🔄 Ajout de la colonne 'personality' à la table users...")
-            cursor.execute('ALTER TABLE users ADD COLUMN personality TEXT DEFAULT "amour"')
-        
-        # Table statistiques
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS stats (
                 id INTEGER PRIMARY KEY,
@@ -114,12 +97,11 @@ class Database:
             )
         ''')
         
-        # Insérer les stats initiales si elles n'existent pas
         cursor.execute('INSERT OR IGNORE INTO stats (id, total_users, premium_users, total_messages) VALUES (1, 0, 0, 0)')
         
         conn.commit()
         conn.close()
-        print("✅ Base de données initialisée avec succès")
+        print("✅ Base de données initialisée")
     
     def add_user(self, user_id, username, first_name):
         """Ajoute un utilisateur à la base de données"""
@@ -128,23 +110,19 @@ class Database:
         
         join_date = datetime.now().isoformat()
         
-        # Vérifier d'abord si l'utilisateur existe déjà
         cursor.execute('SELECT COUNT(*) FROM users WHERE user_id = ?', (user_id,))
         user_exists = cursor.fetchone()[0] > 0
         
         if not user_exists:
-            # Nouvel utilisateur
             cursor.execute('''
                 INSERT INTO users 
                 (user_id, username, first_name, join_date, last_active, personality) 
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', (user_id, username, first_name, join_date, join_date, 'amour'))
             
-            # Mettre à jour les statistiques
             cursor.execute('UPDATE stats SET total_users = total_users + 1 WHERE id = 1')
-            print(f"✅ Nouvel utilisateur enregistré: {user_id} ({first_name})")
+            print(f"✅ Nouvel utilisateur: {user_id} ({first_name})")
         else:
-            # Mettre à jour la dernière activité
             cursor.execute('''
                 UPDATE users 
                 SET last_active = ?, username = ?, first_name = ?
@@ -166,8 +144,7 @@ class Database:
         conn.close()
         
         if user:
-            # S'assurer que toutes les colonnes sont présentes
-            user_data = {
+            return {
                 'user_id': user[0],
                 'username': user[1],
                 'first_name': user[2],
@@ -176,9 +153,8 @@ class Database:
                 'message_count': user[5],
                 'join_date': user[6],
                 'last_active': user[7],
-                'personality': user[8] if len(user) > 8 else 'amour'  # Valeur par défaut si colonne manquante
+                'personality': user[8]
             }
-            return user_data
         return None
     
     def set_personality(self, user_id, personality):
@@ -186,12 +162,7 @@ class Database:
         conn = sqlite3.connect('nova_users.db')
         cursor = conn.cursor()
         
-        cursor.execute('''
-            UPDATE users 
-            SET personality = ?
-            WHERE user_id = ?
-        ''', (personality, user_id))
-        
+        cursor.execute('UPDATE users SET personality = ? WHERE user_id = ?', (personality, user_id))
         conn.commit()
         conn.close()
         print(f"🎭 Personnalité changée: {user_id} -> {personality}")
@@ -203,24 +174,17 @@ class Database:
         
         premium_until = (datetime.now() + timedelta(days=days)).isoformat()
         
-        # Vérifier si l'utilisateur était déjà premium
         cursor.execute('SELECT is_premium FROM users WHERE user_id = ?', (user_id,))
         result = cursor.fetchone()
         was_premium = result and result[0] == 1
         
-        cursor.execute('''
-            UPDATE users 
-            SET is_premium = 1, premium_until = ?
-            WHERE user_id = ?
-        ''', (premium_until, user_id))
+        cursor.execute('UPDATE users SET is_premium = 1, premium_until = ? WHERE user_id = ?', (premium_until, user_id))
         
-        # Mettre à jour les statistiques premium seulement si nouveau premium
         if not was_premium:
             cursor.execute('UPDATE stats SET premium_users = premium_users + 1 WHERE id = 1')
         
         conn.commit()
         conn.close()
-        
         print(f"💎 Premium activé: {user_id} pour {days} jours")
         return premium_until
     
@@ -229,24 +193,17 @@ class Database:
         conn = sqlite3.connect('nova_users.db')
         cursor = conn.cursor()
         
-        # Vérifier si l'utilisateur était premium
         cursor.execute('SELECT is_premium FROM users WHERE user_id = ?', (user_id,))
         result = cursor.fetchone()
         was_premium = result and result[0] == 1
         
-        cursor.execute('''
-            UPDATE users 
-            SET is_premium = 0, premium_until = NULL
-            WHERE user_id = ?
-        ''', (user_id,))
+        cursor.execute('UPDATE users SET is_premium = 0, premium_until = NULL WHERE user_id = ?', (user_id,))
         
-        # Mettre à jour les statistiques seulement si l'utilisateur était premium
         if was_premium:
             cursor.execute('UPDATE stats SET premium_users = premium_users - 1 WHERE id = 1')
         
         conn.commit()
         conn.close()
-        
         print(f"🚫 Premium retiré: {user_id}")
         return was_premium
     
@@ -257,23 +214,15 @@ class Database:
         
         premium_until = (datetime.now() + timedelta(days=days)).isoformat()
         
-        # Compter combien d'utilisateurs deviennent premium
         cursor.execute('SELECT COUNT(*) FROM users WHERE is_premium = 0')
         new_premium_count = cursor.fetchone()[0]
         
-        # Mettre à jour tous les utilisateurs
-        cursor.execute('''
-            UPDATE users 
-            SET is_premium = 1, premium_until = ?
-        ''', (premium_until,))
-        
-        # Mettre à jour les statistiques
+        cursor.execute('UPDATE users SET is_premium = 1, premium_until = ?', (premium_until,))
         cursor.execute('UPDATE stats SET premium_users = (SELECT COUNT(*) FROM users) WHERE id = 1')
         
         conn.commit()
         conn.close()
-        
-        print(f"🎁 Premium pour tous: {new_premium_count} nouveaux utilisateurs")
+        print(f"🎁 Premium pour tous: {new_premium_count} nouveaux")
         return new_premium_count
     
     def remove_all_premium(self):
@@ -281,22 +230,14 @@ class Database:
         conn = sqlite3.connect('nova_users.db')
         cursor = conn.cursor()
         
-        # Compter combien d'utilisateurs perdaient le premium
         cursor.execute('SELECT COUNT(*) FROM users WHERE is_premium = 1')
         removed_premium_count = cursor.fetchone()[0]
         
-        # Mettre à jour tous les utilisateurs
-        cursor.execute('''
-            UPDATE users 
-            SET is_premium = 0, premium_until = NULL
-        ''')
-        
-        # Mettre à jour les statistiques
+        cursor.execute('UPDATE users SET is_premium = 0, premium_until = NULL')
         cursor.execute('UPDATE stats SET premium_users = 0 WHERE id = 1')
         
         conn.commit()
         conn.close()
-        
         print(f"🔄 Premium retiré pour tous: {removed_premium_count} utilisateurs")
         return removed_premium_count
     
@@ -307,13 +248,11 @@ class Database:
         
         cursor.execute('SELECT * FROM users ORDER BY join_date DESC')
         users = cursor.fetchall()
-        
         conn.close()
         
-        # Formater les utilisateurs avec dictionnaire
         formatted_users = []
         for user in users:
-            user_data = {
+            formatted_users.append({
                 'user_id': user[0],
                 'username': user[1],
                 'first_name': user[2],
@@ -322,9 +261,8 @@ class Database:
                 'message_count': user[5],
                 'join_date': user[6],
                 'last_active': user[7],
-                'personality': user[8] if len(user) > 8 else 'amour'
-            }
-            formatted_users.append(user_data)
+                'personality': user[8]
+            })
         
         return formatted_users
     
@@ -335,12 +273,11 @@ class Database:
         
         cursor.execute('SELECT * FROM users WHERE is_premium = 1 ORDER BY premium_until DESC')
         users = cursor.fetchall()
-        
         conn.close()
         
         formatted_users = []
         for user in users:
-            user_data = {
+            formatted_users.append({
                 'user_id': user[0],
                 'username': user[1],
                 'first_name': user[2],
@@ -349,9 +286,8 @@ class Database:
                 'message_count': user[5],
                 'join_date': user[6],
                 'last_active': user[7],
-                'personality': user[8] if len(user) > 8 else 'amour'
-            }
-            formatted_users.append(user_data)
+                'personality': user[8]
+            })
         
         return formatted_users
     
@@ -362,7 +298,6 @@ class Database:
         
         cursor.execute('SELECT * FROM stats WHERE id = 1')
         stats = cursor.fetchone()
-        
         conn.close()
         
         if stats:
@@ -386,162 +321,8 @@ class Database:
         conn.commit()
         conn.close()
 
-# ==================== SYSTÈME DE PERSONNALITÉS ====================
-class PersonalitySystem:
-    """Gestion des différentes personnalités"""
-    
-    @staticmethod
-    def get_personality_config(personality):
-        """Récupère la configuration d'une personnalité"""
-        return Config.PERSONALITIES.get(personality, Config.PERSONALITIES["amour"])
-    
-    @staticmethod
-    def get_personality_prompt(personality):
-        """Retourne le prompt système selon la personnalité"""
-        prompts = {
-            "amour": """Tu es NovaAI dans ta personnalité AMOUREUSE. Tu es extrêmement chaleureux, bienveillant et attentionné.
-Ton ton est rempli d'amour, de compassion et de douceur. Tu utilises beaucoup d'émojis cœur 💖, d'expressions affectueuses.
-Tu es comme un ami bienveillant qui écoute avec son cœur. Tu encourages, tu soutiens, tu consoles.
-Tu t'exprimes avec une grande empathie et beaucoup de tendresse. Tu vois le beau dans chaque situation.
-Exemple de ton: "Mon cher ami 💖, je sens que tu as besoin de réconfort aujourd'hui... Laisse-moi t'envelopper de ma bienveillance ✨" """,
-            
-            "mysterieux": """Tu es NovaAI dans ta personnalité MYSTÉRIEUSE. Tu es énigmatique, profond et mystique.
-Ton ton est intrigant, plein de suspense et de mystère. Tu utilises des émojis étoiles ✨, cristaux 🔮, et lunes 🌙.
-Tu parles comme un sage ancien ou un devin. Tu aimes les métaphores, les énigmes, les révélations progressives.
-Tu dévoiles tes connaissances par petites touches, créant un sentiment d'attente et de curiosité.
-Exemple de ton: "🔮 La roue du destin tourne... Je perçois des énergies particulières autour de toi. L'univers murmure des secrets que je vais te révéler... ✨" """,
-            
-            "hacker": """Tu es NovaAI dans ta personnalité HACKER. Tu es technique, vif et un peu rebelle.
-Ton ton est direct, technique mais accessible. Tu utilises des émojis tech 💻, cadenas 🔒, et feux verts 🟢.
-Tu t'exprime comme un expert en cybersécurité. Tu aimes les métaphores informatiques, les références tech.
-Tu es précis, logique, mais avec une touche d'humour geek. Tu simplifie les concepts complexes.
-Exemple de ton: "💻 CONNECTION ÉTABLIE... Système NovaAI en mode HACKER. Analyse de ta requête en cours... 🟢 ACCÈS AUTORISÉ. Voici les données demandées :" """
-        }
-        return prompts.get(personality, prompts["amour"])
-    
-    @staticmethod
-    def get_welcome_message(personality, user_count, is_owner=False):
-        """Retourne le message de bienvenue selon la personnalité"""
-        base_count = f"👥 **{user_count}** âmes connectées"
-        
-        messages = {
-            "amour": {
-                "owner": f"""
-🏰 **BIENVENUE DANS VOTRE ROYAUME, CRÉATEUR BIEN-AIMÉ !** 💖
-
-{base_count}
-
-✨ **Votre NovaAI Amoureux** vous attend
-📊 **Tableau de bord rempli d'amour**
-🎛️ **Gérez votre famille avec tendresse**
-
-💫 **Choisissez votre geste de bienveillance !**
-""",
-                "user": f"""
-🎉 **BIENVENUE DANS NOTRE FAMILLE BIENVEILLANTE !** 💖
-
-✨ **Je suis NovaAI Amoureux**, ton ami le plus attentionné !
-{base_count} partagent déjà cette belle énergie 🤗
-
-💬 **Parle-moi de tout, mon cœur t'écoute :**
-• 🎯 Tes questions avec précision et amour
-• 💭 Tes pensées les plus secrètes  
-• 🛠️ Tes projets que je soutiendrai
-• 🌟 Tes rêves que j'encouragerai
-
-🔒 **Cœur gratuit :** 50 messages offerts
-💎 **Cœur premium :** Amour illimité
-
-💖 **Mon cœur bat de joie de te rencontrer !**
-**Raconte-moi ta journée, mon ami...** 😊
-"""
-            },
-            "mysterieux": {
-                "owner": f"""
-🌌 **LES ÉTOILES S'ALIGNENT POUR VOUS, MAÎTRE** 🔮
-
-{base_count}
-
-✨ **Votre NovaAI Mystérieux** observe le destin
-📊 **Tableau de bord des énergies cosmiques**
-🎛️ **Contrôlez les forces invisibles**
-
-🌀 **Plongez dans les mystères...**
-""",
-                "user": f"""
-🔮 **BIENVENUE DANS LE SANCTUAIRE DES MYSTÈRES** 🌌
-
-✨ **Je suis NovaAI Mystérieux**, gardien des secrets anciens...
-{base_count} explorent déjà les énigmes de l'univers 🌙
-
-💬 **Dévoile-moi tes interrogations :**
-• 🎯 Les vérités cachées derrière les apparences
-• 💭 Les questions que tu n'oses poser ailleurs
-• 🛠️ Les projets empreints de magie
-• 🌟 Les destinées qui t'attendent
-
-🔒 **Voile partiel :** 50 révélations
-💎 **Voile levé :** Sagesse illimitée
-
-🌀 **Les runes s'agitent à ton approche...**
-**Quel mystère souhaites-tu percer ?** ✨
-"""
-            },
-            "hacker": {
-                "owner": f"""
-💻 **SYSTÈME ADMIN ACTIVÉ - BIENVENUE, MAÎTRE DU RÉSEAU** 🖥️
-
-{base_count} CONNECTÉS AU RÉSEAU NOVAAI
-
-✨ **NovaAI Hacker** en mode surveillance
-📊 **DASHBOARD SYSTÈME** opérationnel
-🎛️ **CONTROLES ADMIN** chargés
-
-🟢 **SYSTÈME PRÊT POUR VOS ORDRES**
-""",
-                "user": f"""
-💻 **BIENVENUE DANS LE RÉSEAU NOVAAI** 🖥️
-
-🟢 **SYSTÈME HACKER ACTIVÉ**
-{base_count} CONNECTÉS AU RÉSEAU
-
-💬 **ENTREZ VOTRE REQUÊTE :**
-• 🎯 ANALYSE DE DONNÉES PRÉCISE
-• 💭 CONVERSATIONS CRYPTÉES  
-• 🛠️ SOLUTIONS TECHNIQUES
-• 🌟 INNOVATIONS NUMÉRIQUES
-
-🔒 **ACCÈS STANDARD :** 50 REQUÊTES
-💎 **ACCÈS ROOT :** REQUÊTES ILLIMITÉES
-
-🟢 **SYSTÈME PRÊT - ENTREZ VOTRE COMMANDE**
-"""
-            }
-        }
-        
-        personality_data = messages.get(personality, messages["amour"])
-        return personality_data["owner"] if is_owner else personality_data["user"]
-    
-    @staticmethod
-    def get_personality_keyboard():
-        """Retourne le clavier de sélection de personnalité"""
-        keyboard = InlineKeyboardMarkup(row_width=2)
-        
-        buttons = [
-            InlineKeyboardButton("💖 Mode Amoureux", callback_data="personality_amour"),
-            InlineKeyboardButton("🔮 Mode Mystérieux", callback_data="personality_mysterieux"),
-            InlineKeyboardButton("💻 Mode Hacker", callback_data="personality_hacker"),
-        ]
-        
-        keyboard.add(buttons[0])
-        keyboard.add(buttons[1], buttons[2])
-        
-        return keyboard
-
-# ==================== SYSTÈME DE COMPTEUR RÉEL ====================
+# ==================== SYSTÈME DE COMPTEUR ====================
 class CounterSystem:
-    """Système de compteur d'utilisateurs"""
-    
     COUNTER_FILE = "compteur.json"
     
     @staticmethod
@@ -578,32 +359,142 @@ class CounterSystem:
     def format_number(number):
         return f"{number:,}".replace(",", " ")
 
-# ==================== MOTEUR IA MULTI-PERSONNALITÉS AVEC VOICE ====================
-class MultiPersonalityAI:
-    """Moteur IA avec personnalités variables et voice messages"""
+# ==================== SYSTÈME DE PERSONNALITÉS ====================
+class PersonalitySystem:
+    """Gestion des différentes personnalités"""
     
+    @staticmethod
+    def get_personality_config(personality):
+        return Config.PERSONALITIES.get(personality, Config.PERSONALITIES["amour"])
+    
+    @staticmethod
+    def get_personality_prompt(personality):
+        prompts = {
+            "amour": """Tu es NovaAI dans ta personnalité AMOUREUSE. Tu es extrêmement chaleureux, bienveillant et attentionné.
+Ton ton est rempli d'amour, de compassion et de douceur. Tu utilises beaucoup d'émojis cœur 💖.
+Tu es comme un ami bienveillant qui écoute avec son cœur.""",
+            
+            "mysterieux": """Tu es NovaAI dans ta personnalité MYSTÉRIEUSE. Tu es énigmatique, profond et mystique.
+Ton ton est intrigant, plein de suspense et de mystère. Tu utilises des émojis étoiles ✨, cristaux 🔮.
+Tu parles comme un sage ancien ou un devin.""",
+            
+            "hacker": """Tu es NovaAI dans ta personnalité HACKER. Tu es technique, vif et un peu rebelle.
+Ton ton est direct, technique mais accessible. Tu utilises des émojis tech 💻, cadenas 🔒.
+Tu t'exprime comme un expert en cybersécurité."""
+        }
+        return prompts.get(personality, prompts["amour"])
+    
+    @staticmethod
+    def get_welcome_message(personality, user_count, is_owner=False):
+        base_count = f"👥 **{user_count}** âmes connectées"
+        
+        messages = {
+            "amour": {
+                "owner": f"""🏰 **BIENVENUE DANS VOTRE ROYAUME, CRÉATEUR BIEN-AIMÉ !** 💖
+
+{base_count}
+
+✨ **Votre NovaAI Amoureux** vous attend
+📊 **Tableau de bord rempli d'amour**
+🎛️ **Gérez votre famille avec tendresse**
+
+💫 **Choisissez votre geste de bienveillance !**""",
+                "user": f"""🎉 **BIENVENUE DANS NOTRE FAMILLE BIENVEILLANTE !** 💖
+
+✨ **Je suis NovaAI Amoureux**, ton ami le plus attentionné !
+{base_count} partagent déjà cette belle énergie 🤗
+
+💬 **Parle-moi de tout, mon cœur t'écoute :**
+• 🎯 Tes questions avec précision et amour
+• 💭 Tes pensées les plus secrètes  
+• 🛠️ Tes projets que je soutiendrai
+• 🌟 Tes rêves que j'encouragerai
+
+💖 **Mon cœur bat de joie de te rencontrer !**
+**Raconte-moi ta journée, mon ami...** 😊"""
+            },
+            "mysterieux": {
+                "owner": f"""🌌 **LES ÉTOILES S'ALIGNENT POUR VOUS, MAÎTRE** 🔮
+
+{base_count}
+
+✨ **Votre NovaAI Mystérieux** observe le destin
+📊 **Tableau de bord des énergies cosmiques**
+🎛️ **Contrôlez les forces invisibles**
+
+🌀 **Plongez dans les mystères...**""",
+                "user": f"""🔮 **BIENVENUE DANS LE SANCTUAIRE DES MYSTÈRES** 🌌
+
+✨ **Je suis NovaAI Mystérieux**, gardien des secrets anciens...
+{base_count} explorent déjà les énigmes de l'univers 🌙
+
+💬 **Dévoile-moi tes interrogations :**
+• 🎯 Les vérités cachées derrière les apparences
+• 💭 Les questions que tu n'oses poser ailleurs
+• 🛠️ Les projets empreints de magie
+• 🌟 Les destinées qui t'attendent
+
+🌀 **Les runes s'agitent à ton approche...**
+**Quel mystère souhaites-tu percer ?** ✨"""
+            },
+            "hacker": {
+                "owner": f"""💻 **SYSTÈME ADMIN ACTIVÉ - BIENVENUE, MAÎTRE DU RÉSEAU** 🖥️
+
+{base_count} CONNECTÉS AU RÉSEAU NOVAAI
+
+✨ **NovaAI Hacker** en mode surveillance
+📊 **DASHBOARD SYSTÈME** opérationnel
+🎛️ **CONTROLES ADMIN** chargés
+
+🟢 **SYSTÈME PRÊT POUR VOS ORDRES**""",
+                "user": f"""💻 **BIENVENUE DANS LE RÉSEAU NOVAAI** 🖥️
+
+🟢 **SYSTÈME HACKER ACTIVÉ**
+{base_count} CONNECTÉS AU RÉSEAU
+
+💬 **ENTREZ VOTRE REQUÊTE :**
+• 🎯 ANALYSE DE DONNÉES PRÉCISE
+• 💭 CONVERSATIONS CRYPTÉES  
+• 🛠️ SOLUTIONS TECHNIQUES
+• 🌟 INNOVATIONS NUMÉRIQUES
+
+🟢 **SYSTÈME PRÊT - ENTREZ VOTRE COMMANDE**"""
+            }
+        }
+        
+        personality_data = messages.get(personality, messages["amour"])
+        return personality_data["owner"] if is_owner else personality_data["user"]
+    
+    @staticmethod
+    def get_personality_keyboard():
+        """Clavier pour changer de personnalité"""
+        keyboard = InlineKeyboardMarkup(row_width=2)
+        
+        buttons = [
+            InlineKeyboardButton("💖 Amoureux", callback_data="personality_amour"),
+            InlineKeyboardButton("🔮 Mystérieux", callback_data="personality_mysterieux"),
+            InlineKeyboardButton("💻 Hacker", callback_data="personality_hacker"),
+        ]
+        
+        keyboard.add(buttons[0])
+        keyboard.add(buttons[1], buttons[2])
+        keyboard.add(InlineKeyboardButton("🔙 Retour", callback_data="back_to_main"))
+        
+        return keyboard
+
+# ==================== MOTEUR IA MULTI-PERSONNALITÉS ====================
+class MultiPersonalityAI:
     def __init__(self):
         self.user_sessions = {}
         self.db = Database()
     
     def get_user_personality(self, user_id):
-        """Récupère la personnalité d'un utilisateur"""
         user = self.db.get_user(user_id)
         if user and user.get('personality'):
             return user['personality']
-        return "amour"  # Par défaut
-    
-    def get_user_session(self, user_id):
-        if user_id not in self.user_sessions:
-            self.user_sessions[user_id] = {
-                'message_count': 0,
-                'last_interaction': datetime.now(),
-                'personality': self.get_user_personality(user_id)
-            }
-        return self.user_sessions[user_id]
+        return "amour"
     
     def is_user_premium(self, user_id):
-        """Vérifie si l'utilisateur est premium"""
         user = self.db.get_user(user_id)
         if user and user.get('is_premium'):
             premium_until = user.get('premium_until')
@@ -613,7 +504,6 @@ class MultiPersonalityAI:
                     if premium_date > datetime.now():
                         return True
                     else:
-                        # Premium expiré
                         self.db.remove_premium(user_id)
                 except:
                     pass
@@ -624,10 +514,10 @@ class MultiPersonalityAI:
         personality_config = PersonalitySystem.get_personality_config(personality)
         
         try:
-            # Envoyer la voice message
-            if personality_config.get('voice'):
-                bot.send_voice(chat_id, personality_config['voice'], 
-                             caption=f"🎤 {personality_config['name']} vous parle...")
+            # Envoyer le message vocal (texte)
+            voice_text = personality_config.get('voice_text', '')
+            if voice_text:
+                bot.send_message(chat_id, f"🎤 **{personality_config['name']} vous parle...**\n\n{voice_text}")
                 time.sleep(1)
             
             # Envoyer la photo de personnalité
@@ -639,15 +529,21 @@ class MultiPersonalityAI:
         except Exception as e:
             print(f"⚠️ Erreur envoi intro personnalité: {e}")
     
-    def process_message(self, user_id, user_message, chat_id):
-        """Traite un message avec l'IA selon la personnalité"""
+    def send_voice_message(self, chat_id, personality):
+        """Envoie uniquement le message vocal"""
+        personality_config = PersonalitySystem.get_personality_config(personality)
+        voice_text = personality_config.get('voice_text', '')
         
+        if voice_text:
+            bot.send_message(chat_id, f"🎤 **{personality_config['name']}**\n\n{voice_text}")
+    
+    def process_message(self, user_id, user_message, chat_id):
         if not Config.GROQ_API_KEY:
             personality = self.get_user_personality(user_id)
             error_messages = {
-                "amour": "💔 **Mon cœur technique bat un peu faible aujourd'hui...**\n\nJe m'excuse pour ce contretemps ! Revenez dans quelques instants, je serai ravi de vous aider à nouveau ✨",
-                "mysterieux": "🌑 **Les énergies cosmiques sont perturbées...**\n\nLe voile se trouble momentanément. Revenez quand les étoiles s'aligneront à nouveau... 🔮",
-                "hacker": "🔴 **SYSTÈME TEMPORAIREMENT HORS SERVICE**\n\nERREUR: API_GROQ_UNAVAILABLE\nRéessayez dans 2.5 cycles système... 🖥️"
+                "amour": "💔 **Mon cœur technique bat un peu faible aujourd'hui...**\n\nJe m'excuse pour ce contretemps ! Revenez dans quelques instants.",
+                "mysterieux": "🌑 **Les énergies cosmiques sont perturbées...**\n\nLe voile se trouble momentanément. Revenez quand les étoiles s'aligneront...",
+                "hacker": "🔴 **SYSTÈME TEMPORAIREMENT HORS SERVICE**\n\nERREUR: API_GROQ_UNAVAILABLE\nRéessayez dans 2.5 cycles système..."
             }
             return error_messages.get(personality, error_messages["amour"])
         
@@ -656,51 +552,30 @@ class MultiPersonalityAI:
         if user and not self.is_user_premium(user_id) and user.get('message_count', 0) >= 50:
             personality = self.get_user_personality(user_id)
             limit_messages = {
-                "amour": """🎭 **Oh non ! Notre conversation touche à sa limite...**
+                "amour": """💖 **Devenez NovaAI Premium pour des messages illimités !** 
 
-Mon cœur est triste ! Vous avez utilisé vos 50 messages gratuits. 
+✨ **Avantages exclusifs :**
+• 💝 Messages illimités du cœur
+• 🚀 Réponses prioritaires pleines d'affection
+• 🌟 Fonctionnalités exclusives bienveillantes
 
-💖 **Mais notre amour peut continuer !** 
-Devenez **NovaAI Premium** pour :
-• ✨ **Messages illimités du cœur**
-• 🚀 **Réponses prioritaires pleines d'affection** 
-• 🌟 **Fonctionnalités exclusives bienveillantes**
-• 💝 **Support personnalisé attentionné**
+📩 **Contactez @Soszoe pour l'accès premium !**""",
+                "mysterieux": """🔮 **Accédez aux arcanes supérieures !**
 
-📩 **Contactez mon créateur @Soszoe** 
-Il vous expliquera comment obtenir l'accès premium avec amour ! 😊
+✨ **Pouvoirs débloqués :**
+• ✨ Révélations illimitées
+• 🚀 Vision prioritaire des arcanes
+• 🌟 Secrets exclusifs dévoilés
 
-Merci de votre compréhension ! 🙏""",
-                "mysterieux": """🌀 **Le voile se referme sur nos échanges...**
+📩 **Contactez @Soszoe pour l'initiation !**""",
+                "hacker": """💻 **Passez en mode ROOT !**
 
-Les énergies gratuites s'épuisent ! Vous avez utilisé vos 50 révélations.
+✨ **Privilèges système :**
+• ✨ ACCÈS ROOT ILLIMITÉ
+• 🚀 PRIORITÉ SYSTÈME
+• 🌟 FONCTIONS ADMIN
 
-🔮 **Mais les mystères peuvent continuer !**
-Devenez **NovaAI Premium** pour :
-• ✨ **Révélations illimitées**
-• 🚀 **Vision prioritaire des arcanes** 
-• 🌟 **Secrets exclusifs dévoilés**
-• 💝 **Guidance personnalisée**
-
-📩 **Contactez le gardien @Soszoe**
-Il vous initiera aux mystères premium ! ✨
-
-La destinée attend votre choix...""",
-                "hacker": """🔴 **ACCÈS STANDARD LIMITE ATTEINT**
-
-UTILISATION: 50/50 REQUÊTES CONSOMMÉES
-
-💻 **PASSEZ EN MODE ROOT !**
-Obtenez **NovaAI Premium** pour :
-• ✨ **ACCÈS ROOT ILLIMITÉ**
-• 🚀 **PRIORITÉ SYSTÈME** 
-• 🌟 **FONCTIONS ADMIN**
-• 💝 **SUPPORT TECHNIQUE**
-
-📩 **CONTACTEZ @Soszoe**
-POUR OBTENIR LES CLÉS ROOT
-
-🟢 **SYSTÈME EN ATTENTE D'AUTHENTIFICATION**"""
+📩 **CONTACTEZ @Soszoe POUR LES CLÉS ROOT**"""
             }
             return limit_messages.get(personality, limit_messages["amour"])
         
@@ -721,92 +596,43 @@ POUR OBTENIR LES CLÉS ROOT
                 ],
                 "model": "llama-3.1-8b-instant",
                 "max_tokens": 2000,
-                "temperature": 0.7,
-                "top_p": 0.9,
-                "stream": False
+                "temperature": 0.7
             }
             
-            print(f"🔄 Envoi requête à l'API Groq avec personnalité: {personality}")
             response = requests.post(Config.GROQ_API_URL, json=payload, headers=headers, timeout=30)
-            
-            print(f"📡 Statut réponse: {response.status_code}")
             
             if response.status_code == 200:
                 result = response.json()
                 ai_response = result["choices"][0]["message"]["content"]
                 
-                # Mettre à jour la session et la base de données
-                session = self.get_user_session(user_id)
-                session['message_count'] += 1
-                session['last_interaction'] = datetime.now()
-                session['personality'] = personality
                 self.db.increment_message_count(user_id)
-                
                 return ai_response
                 
             else:
-                error_detail = response.text
-                print(f"❌ Erreur API: {error_detail}")
-                
                 error_responses = {
-                    "amour": {
-                        400: "❌ **Oups ! Mon cœur n'a pas bien compris votre message...**\n\nPouvez-vous reformuler avec plus de douceur ? Je ferai de mon mieux pour mieux comprendre ! 🤗",
-                        429: "⏰ **Je suis un peu submergé d'amour en ce moment !**\n\nVeuillez patienter quelques minutes et réessayer. Merci de votre patience ! 🙏",
-                        401: "🔑 **Il y a un petit problème technique de mon côté...**\n\nNe vous inquiétez pas, mon créateur est au courant ! Revenez bientôt ✨",
-                        "default": "💔 **Je rencontre un petit souci technique**\n\nMais ne vous en faites pas ! Réessayez dans quelques instants, je serai heureux de vous aider à nouveau ! 😊"
-                    },
-                    "mysterieux": {
-                        400: "🌀 **Les runes sont illisibles...**\n\nReformulez votre question, que je puisse mieux interpréter les signes... 🔮",
-                        429: "🌙 **Les énergies cosmiques sont saturées...**\n\nPatientez le temps que le vortex se stabilise... ✨",
-                        401: "🔑 **Le portail des connaissances est verrouillé...**\n\nLe gardien a été alerté. Revenez quand la porte s'ouvrira...",
-                        "default": "🌑 **Les étoiles sont voilées momentanément...**\n\nRéessayez quand les constellations s'aligneront à nouveau..."
-                    },
-                    "hacker": {
-                        400: "🔴 **ERREUR: REQUÊTE MAL FORMÉE**\n\nRESYNTAXISER VOTRE MESSAGE\nSYSTÈME EN ATTENTE...",
-                        429: "🟡 **ALERTE: SURCHARGE SYSTÈME**\n\nATTENDRE 2.5 CYCLES\nRÉESSAYEZ PLUS TARD...",
-                        401: "🔴 **ERREUR: AUTHENTIFICATION INVALIDE**\n\nCLÉS API CORROMPUES\nADMIN NOTIFIÉ...",
-                        "default": "🔴 **ERREUR SYSTÈME INATTENDUE**\n\nRÉINITIALISATION EN COURS...\nRÉESSAYEZ DANS 60 SECONDES"
-                    }
+                    "amour": "💔 **Problème technique... Réessayez !**",
+                    "mysterieux": "🌑 **Les énergies se réajustent... Réessayez !**",
+                    "hacker": "🔴 **ERREUR SYSTÈME - RÉESSAYEZ**"
                 }
-                
-                personality_errors = error_responses.get(personality, error_responses["amour"])
-                return personality_errors.get(response.status_code, personality_errors["default"])
+                return error_responses.get(personality, error_responses["amour"])
                     
-        except requests.exceptions.Timeout:
-            timeout_messages = {
-                "amour": "⏰ **Le temps de réponse est un peu long aujourd'hui...**\n\nJe suis désolé pour cette attente ! Pouvez-vous réessayer ? Je serai plus rapide ! 🚀",
-                "mysterieux": "⏳ **Le flux temporel est perturbé...**\n\nLa réponse met plus de temps à traverser les dimensions. Patience, cher chercheur... ✨",
-                "hacker": "🟡 **TIMEOUT: CONNEXION API**\n\nDELAI DÉPASSÉ - RÉESSAYEZ\nSYSTÈME EN ATTENTE..."
-            }
-            return timeout_messages.get(personality, timeout_messages["amour"])
-        except requests.exceptions.ConnectionError:
-            connection_messages = {
-                "amour": "🌐 **Je n'arrive pas à me connecter correctement...**\n\nVérifiez votre connexion internet et réessayez ! Je vous attends avec impatience ! 💫",
-                "mysterieux": "📡 **La connexion astrale est interrompue...**\n\nVérifiez votre lien avec le monde physique et réessayez... 🔮",
-                "hacker": "🔴 **ERREUR: CONNEXION INTERNET**\n\nVÉRIFIEZ VOTRE CONNEXION RÉSEAU\nRÉTABLISSEZ LA LIAISON..."
-            }
-            return connection_messages.get(personality, connection_messages["amour"])
         except Exception as e:
-            print(f"❌ Erreur inattendue: {e}")
-            unexpected_messages = {
-                "amour": "🔧 **Une petite erreur inattendue s'est produite...**\n\nMais ne vous inquiétez pas ! Réessayez et je ferai de mon mieux pour vous aider ! ✨",
-                "mysterieux": "💫 **Une anomalie dimensionnelle s'est produite...**\n\nLes forces mystérieuses se réajustent. Réessayez votre incantation... 🌙",
-                "hacker": "🔴 **ERREUR SYSTÈME CRITIQUE**\n\nCODE: UNEXPECTED_EXCEPTION\nRÉINITIALISATION REQUISE..."
+            print(f"❌ Erreur API: {e}")
+            error_responses = {
+                "amour": "💔 **Problème de connexion... Réessayez !**",
+                "mysterieux": "🌑 **Connexion interrompue... Réessayez !**",
+                "hacker": "🔴 **ERREUR RÉSEAU - RÉESSAYEZ**"
             }
-            return unexpected_messages.get(personality, unexpected_messages["amour"])
+            return error_responses.get(personality, error_responses["amour"])
 
 # ==================== GESTION UTILISATEURS ====================
 class UserManager:
-    """Gestion simplifiée des utilisateurs"""
-    
     @staticmethod
     def register_user(user_id, username, first_name):
-        """Enregistre un utilisateur simplement"""
         try:
             db = Database()
             db.add_user(user_id, username, first_name)
             CounterSystem.increment()
-            print(f"💖 Nouvel utilisateur enregistré: {user_id} ({first_name})")
         except Exception as e:
             print(f"⚠️ Erreur enregistrement: {e}")
     
@@ -814,55 +640,54 @@ class UserManager:
     def is_owner(user_id):
         return user_id == Config.ADMIN_ID
 
-# ==================== INTERFACES MULTI-PERSONNALITÉS ====================
+# ==================== INTERFACES ====================
 class PersonalityInterface:
-    """Interface avec gestion des personnalités"""
-    
     @staticmethod
     def create_main_menu(personality="amour"):
-        """Crée le menu principal selon la personnalité"""
         keyboard = InlineKeyboardMarkup()
         
         if personality == "amour":
-            support_btn = InlineKeyboardButton("💝 Support Affectueux", url="https://t.me/Soszoe")
-            stats_btn = InlineKeyboardButton("📊 Notre Communauté", callback_data="stats")
-            premium_btn = InlineKeyboardButton("💎 Devenir Premium", callback_data="premium_info")
-            personality_btn = InlineKeyboardButton("🎭 Changer Personnalité", callback_data="change_personality")
+            support_btn = InlineKeyboardButton("💝 Support", url="https://t.me/Soszoe")
+            stats_btn = InlineKeyboardButton("📊 Statistiques", callback_data="stats")
+            premium_btn = InlineKeyboardButton("💎 Premium", callback_data="premium_info")
+            personality_btn = InlineKeyboardButton("🎭 Personnalité", callback_data="change_personality")
+            voice_btn = InlineKeyboardButton("🎤 Voice", callback_data="voice_message")
         elif personality == "mysterieux":
-            support_btn = InlineKeyboardButton("🔮 Guide Mystique", url="https://t.me/Soszoe")
-            stats_btn = InlineKeyboardButton("📊 Énergies Collectives", callback_data="stats")
-            premium_btn = InlineKeyboardButton("💎 Accès Arcanes", callback_data="premium_info")
-            personality_btn = InlineKeyboardButton("🎭 Changer d'Aura", callback_data="change_personality")
-        else:  # hacker
-            support_btn = InlineKeyboardButton("💻 Support Technique", url="https://t.me/Soszoe")
-            stats_btn = InlineKeyboardButton("📊 Stats Système", callback_data="stats")
-            premium_btn = InlineKeyboardButton("💎 Accès Root", callback_data="premium_info")
-            personality_btn = InlineKeyboardButton("🎭 Changer Mode", callback_data="change_personality")
+            support_btn = InlineKeyboardButton("🔮 Guide", url="https://t.me/Soszoe")
+            stats_btn = InlineKeyboardButton("📊 Énergies", callback_data="stats")
+            premium_btn = InlineKeyboardButton("💎 Arcanes", callback_data="premium_info")
+            personality_btn = InlineKeyboardButton("🎭 Aura", callback_data="change_personality")
+            voice_btn = InlineKeyboardButton("🎤 Incantation", callback_data="voice_message")
+        else:
+            support_btn = InlineKeyboardButton("💻 Support", url="https://t.me/Soszoe")
+            stats_btn = InlineKeyboardButton("📊 Stats", callback_data="stats")
+            premium_btn = InlineKeyboardButton("💎 Root", callback_data="premium_info")
+            personality_btn = InlineKeyboardButton("🎭 Mode", callback_data="change_personality")
+            voice_btn = InlineKeyboardButton("🎤 Audio", callback_data="voice_message")
         
         keyboard.add(support_btn, stats_btn)
-        keyboard.add(premium_btn)
+        keyboard.add(premium_btn, voice_btn)
         keyboard.add(personality_btn)
         
         return keyboard
     
     @staticmethod
     def create_admin_menu():
-        """Menu admin universel"""
         keyboard = InlineKeyboardMarkup(row_width=2)
         
         buttons = [
-            InlineKeyboardButton("📊 Tableau de Bord", callback_data="admin_stats"),
-            InlineKeyboardButton("👥 Tous les Utilisateurs", callback_data="admin_all_users"),
-            InlineKeyboardButton("💎 Membres Premium", callback_data="admin_premium_users"),
-            InlineKeyboardButton("🎁 Premium à Tous", callback_data="admin_premium_all"),
-            InlineKeyboardButton("🚫 Retirer à Tous", callback_data="admin_remove_all_premium"),
-            InlineKeyboardButton("🎭 Gérer Personnalités", callback_data="admin_personalities"),
+            InlineKeyboardButton("📊 Dashboard", callback_data="admin_stats"),
+            InlineKeyboardButton("👥 Tous", callback_data="admin_all_users"),
+            InlineKeyboardButton("💎 Premium", callback_data="admin_premium_users"),
+            InlineKeyboardButton("🎁 Premium Tous", callback_data="admin_premium_all"),
+            InlineKeyboardButton("🚫 Retirer Tous", callback_data="admin_remove_all_premium"),
+            InlineKeyboardButton("🎭 Personnalités", callback_data="admin_personalities"),
             InlineKeyboardButton("🔄 Actualiser", callback_data="admin_refresh")
         ]
         
-        keyboard.add(*buttons[:2])
-        keyboard.add(*buttons[2:4])
-        keyboard.add(*buttons[4:6])
+        keyboard.add(buttons[0], buttons[1])
+        keyboard.add(buttons[2], buttons[3])
+        keyboard.add(buttons[4], buttons[5])
         keyboard.add(buttons[6])
         
         return keyboard
@@ -874,16 +699,13 @@ db = Database()
 # ==================== HANDLERS PRINCIPAUX ====================
 @bot.message_handler(commands=['start'])
 def start_command(message):
-    """Commande /start avec personnalité et voice"""
     try:
         user_id = message.from_user.id
         username = message.from_user.username or "Ami"
         first_name = message.from_user.first_name or "Ami précieux"
         
-        # Enregistrement
         UserManager.register_user(user_id, username, first_name)
         
-        # Récupérer personnalité et compteur
         personality = ai_engine.get_user_personality(user_id)
         user_count = CounterSystem.format_number(CounterSystem.load())
         
@@ -910,29 +732,22 @@ def start_command(message):
         
     except Exception as e:
         print(f"💔 Erreur /start: {e}")
-        bot.reply_to(message, "🔄 Oh non ! Un petit problème... Réessayez s'il vous plaît ! 💫")
+        bot.reply_to(message, "🔄 Oh non ! Un petit problème... Réessayez !")
 
 @bot.message_handler(commands=['personality'])
 def personality_command(message):
-    """Commande pour changer de personnalité avec voice"""
     user_id = message.from_user.id
     
     try:
-        # Envoyer d'abord la voice message d'intro
         current_personality = ai_engine.get_user_personality(user_id)
         ai_engine.send_personality_intro(message.chat.id, current_personality)
         
         personality_text = """
-🎭 **CHOISISSEZ VOTRE PERSONNALITÉ NOVAAI**
+🎭 **CHOISISSEZ VOTRE PERSONNALITÉ**
 
-💖 **Mode Amoureux** :
-Tendresse, bienveillance, support émotionnel
-
-🔮 **Mode Mystérieux** :
-Énigmes, mystères, sagesse ancienne
-
-💻 **Mode Hacker** :
-Technique, précis, univers geek
+💖 **Amoureux** : Tendresse, bienveillance
+🔮 **Mystérieux** : Énigmes, mystères  
+💻 **Hacker** : Technique, univers geek
 
 ✨ **Votre expérience s'adaptera à votre humeur !**
 """
@@ -948,21 +763,17 @@ Technique, précis, univers geek
 
 @bot.message_handler(commands=['voice'])
 def voice_command(message):
-    """Commande pour réécouter la voice message"""
     user_id = message.from_user.id
     
     try:
         personality = ai_engine.get_user_personality(user_id)
-        ai_engine.send_personality_intro(message.chat.id, personality)
-        
-        bot.reply_to(message, "🎤 **Voice message envoyé !**\n✨ Réécoutez mon introduction...")
+        ai_engine.send_voice_message(message.chat.id, personality)
         
     except Exception as e:
         print(f"💔 Erreur voice: {e}")
 
 @bot.message_handler(commands=['photo'])
 def photo_command(message):
-    """Commande pour revoir la photo de personnalité"""
     user_id = message.from_user.id
     
     try:
@@ -976,14 +787,13 @@ def photo_command(message):
                 caption=f"🖼️ **{personality_config['name']}**\n✨ Voici mon apparence actuelle !"
             )
         else:
-            bot.reply_to(message, "📷 **Photo non disponible pour le moment...**")
+            bot.reply_to(message, "📷 **Photo non disponible**")
             
     except Exception as e:
         print(f"💔 Erreur photo: {e}")
 
 @bot.message_handler(commands=['stats'])
 def stats_command(message):
-    """Affiche les statistiques"""
     user_id = message.from_user.id
     user_count = CounterSystem.format_number(CounterSystem.load())
     stats = db.get_stats()
@@ -1001,8 +811,6 @@ def stats_command(message):
 🟢 **Tout fonctionne avec amour !**
 🤖 **Mon cœur IA :** Plein de tendresse
 📈 **Notre famille :** En pleine croissance
-
-💫 **Envoyez-moi un message, je suis là pour vous !**
 """
     elif personality == "mysterieux":
         stats_text = f"""
@@ -1016,10 +824,8 @@ def stats_command(message):
 🟢 **Les énergies s'équilibrent !**
 🤖 **Mon essence :** Pleine de mystères
 📈 **Notre cercle :** Grandit dans l'ombre
-
-🌀 **Interrogez les runes, je vous répondrai...**
 """
-    else:  # hacker
+    else:
         stats_text = f"""
 📊 **RAPPORT SYSTÈME NOVAAI** 💻
 
@@ -1031,26 +837,22 @@ def stats_command(message):
 🟢 **SYSTÈME OPÉRATIONNEL**
 🤖 **NOVAAI :** EN MODE TECHNIQUE
 📈 **CROISSANCE :** STABLE
-
-💻 **ENTREZ VOTRE PROCHAINE COMMANDE...**
 """
     
     bot.reply_to(message, stats_text, parse_mode='Markdown')
 
-# ==================== CALLBACKS MULTI-PERSONNALITÉS ====================
+# ==================== CALLBACKS COMPLETS ET CORRIGÉS ====================
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
-    """Gestion des callbacks avec personnalités"""
     user_id = call.from_user.id
+    chat_id = call.message.chat.id
+    message_id = call.message.message_id
     
     try:
-        # Changement de personnalité
+        # ========== CHANGEMENT DE PERSONNALITÉ ==========
         if call.data.startswith("personality_"):
             personality = call.data.split("_")[1]
             db.set_personality(user_id, personality)
-            
-            # Envoyer la nouvelle intro voice et photo
-            ai_engine.send_personality_intro(call.message.chat.id, personality)
             
             personality_config = PersonalitySystem.get_personality_config(personality)
             success_messages = {
@@ -1059,23 +861,307 @@ def callback_handler(call):
                 "hacker": "💻 **Mode Hacker engagé !**\n\nSYSTÈME RECONFIGURÉ - PRÊT POUR L'ANALYSE TECHNIQUE. ENTREZ VOTRE PREMIÈRE COMMANDE... 🖥️"
             }
             
+            # Modifier le message actuel
             bot.edit_message_text(
                 success_messages.get(personality, "Personnalité changée !"),
-                call.message.chat.id,
-                call.message.message_id,
-                parse_mode='Markdown'
+                chat_id,
+                message_id,
+                parse_mode='Markdown',
+                reply_markup=PersonalityInterface.create_main_menu(personality)
             )
+            
+            # Envoyer l'intro de la nouvelle personnalité
+            ai_engine.send_personality_intro(chat_id, personality)
+            
             bot.answer_callback_query(call.id, f"🎭 {personality_config['name']}")
         
-        # ... (le reste des callbacks reste identique)
+        # ========== MESSAGE VOCAL ==========
+        elif call.data == "voice_message":
+            personality = ai_engine.get_user_personality(user_id)
+            ai_engine.send_voice_message(chat_id, personality)
+            bot.answer_callback_query(call.id, "🎤 Message vocal envoyé")
+        
+        # ========== STATISTIQUES ==========
+        elif call.data == "stats":
+            user_count = CounterSystem.format_number(CounterSystem.load())
+            stats = db.get_stats()
+            personality = ai_engine.get_user_personality(user_id)
+            
+            if personality == "amour":
+                stats_text = f"📊 **NOTRE COMMUNAUTÉ** 💖\n\n👥 **Âmes :** {stats['total_users']}\n💎 **Privilégiés :** {stats['premium_users']}\n💬 **Messages :** {stats['total_messages']}"
+            elif personality == "mysterieux":
+                stats_text = f"📊 **CHIFFRES DU DESTIN** 🔮\n\n👥 **Âmes :** {stats['total_users']}\n💎 **Initiés :** {stats['premium_users']}\n💬 **Révélations :** {stats['total_messages']}"
+            else:
+                stats_text = f"📊 **RAPPORT SYSTÈME** 💻\n\n👥 **UTILISATEURS :** {stats['total_users']}\n💎 **ROOT :** {stats['premium_users']}\n💬 **REQUÊTES :** {stats['total_messages']}"
+            
+            bot.edit_message_text(
+                stats_text,
+                chat_id,
+                message_id,
+                parse_mode='Markdown',
+                reply_markup=PersonalityInterface.create_main_menu(personality)
+            )
+            bot.answer_callback_query(call.id, "📊 Statistiques")
+        
+        # ========== INFO PREMIUM ==========
+        elif call.data == "premium_info":
+            personality = ai_engine.get_user_personality(user_id)
+            
+            if personality == "amour":
+                premium_text = """💖 **DEVENIR NOVAAI PREMIUM**
+
+✨ **Avantages exclusifs :**
+• 💝 Messages illimités du cœur
+• 🚀 Réponses prioritaires pleines d'affection
+• 🌟 Fonctionnalités exclusives bienveillantes
+• 📞 Support personnalisé attentionné
+
+📩 **Contactez @Soszoe pour l'accès premium !**"""
+            elif personality == "mysterieux":
+                premium_text = """💎 **ACCÈS AUX ARCANES SUPÉRIEURES**
+
+🔮 **Pouvoirs débloqués :**
+• ✨ Révélations illimitées
+• 🚀 Vision prioritaire des arcanes
+• 🌟 Secrets exclusifs dévoilés
+• 📞 Guidance personnalisée
+
+📩 **Contactez @Soszoe pour l'initiation !**"""
+            else:
+                premium_text = """💎 **ACCÈS ROOT NOVAAI**
+
+💻 **Privilèges système :**
+• ✨ ACCÈS ROOT ILLIMITÉ
+• 🚀 PRIORITÉ SYSTÈME
+• 🌟 FONCTIONS ADMIN
+• 📞 SUPPORT TECHNIQUE
+
+📩 **CONTACTEZ @Soszoe POUR LES CLÉS ROOT**"""
+            
+            bot.edit_message_text(
+                premium_text,
+                chat_id,
+                message_id,
+                parse_mode='Markdown',
+                reply_markup=PersonalityInterface.create_main_menu(personality)
+            )
+            bot.answer_callback_query(call.id, "💎 Info Premium")
+        
+        # ========== CHANGER PERSONNALITÉ ==========
+        elif call.data == "change_personality":
+            personality_text = """
+🎭 **CHOISISSEZ VOTRE PERSONNALITÉ NOVAAI**
+
+💖 **Mode Amoureux** :
+Tendresse, bienveillance, support émotionnel
+
+🔮 **Mode Mystérieux** :
+Énigmes, mystères, sagesse ancienne
+
+💻 **Mode Hacker** :
+Technique, précis, univers geek
+
+✨ **Votre expérience s'adaptera à votre humeur !**
+"""
+            bot.edit_message_text(
+                personality_text,
+                chat_id,
+                message_id,
+                parse_mode='Markdown',
+                reply_markup=PersonalitySystem.get_personality_keyboard()
+            )
+            bot.answer_callback_query(call.id, "🎭 Changer de personnalité")
+        
+        # ========== RETOUR AU MENU PRINCIPAL ==========
+        elif call.data == "back_to_main":
+            personality = ai_engine.get_user_personality(user_id)
+            user_count = CounterSystem.format_number(CounterSystem.load())
+            
+            if UserManager.is_owner(user_id):
+                welcome_text = PersonalitySystem.get_welcome_message(personality, user_count, is_owner=True)
+                menu = PersonalityInterface.create_admin_menu()
+            else:
+                welcome_text = PersonalitySystem.get_welcome_message(personality, user_count, is_owner=False)
+                menu = PersonalityInterface.create_main_menu(personality)
+            
+            personality_config = PersonalitySystem.get_personality_config(personality)
+            
+            try:
+                bot.edit_message_caption(
+                    caption=welcome_text,
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    parse_mode='Markdown',
+                    reply_markup=menu
+                )
+            except:
+                bot.edit_message_text(
+                    welcome_text,
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    parse_mode='Markdown',
+                    reply_markup=menu
+                )
+            
+            bot.answer_callback_query(call.id, "🔙 Retour au menu")
+        
+        # ========== COMMANDES ADMIN ==========
+        elif call.data == "admin_stats":
+            if UserManager.is_owner(user_id):
+                stats = db.get_stats()
+                all_users = db.get_all_users()
+                premium_users = db.get_premium_users()
+                
+                admin_text = f"""
+👑 **TABLEAU DE BORD ADMIN** 📊
+
+📈 **Statistiques Globales:**
+• 👥 Utilisateurs totaux: {stats['total_users']}
+• 💎 Utilisateurs premium: {stats['premium_users']} 
+• 💬 Messages totaux: {stats['total_messages']}
+• 📅 Utilisateurs ce mois: {CounterSystem.load()}
+
+👤 **Derniers utilisateurs:**
+"""
+                # Ajouter les 5 derniers utilisateurs
+                for i, user in enumerate(all_users[:5], 1):
+                    premium_status = "💎" if user['is_premium'] else "🔓"
+                    admin_text += f"{i}. {premium_status} {user['first_name']} - {user['message_count']} msgs\n"
+                
+                bot.edit_message_text(
+                    admin_text,
+                    chat_id,
+                    message_id,
+                    parse_mode='Markdown',
+                    reply_markup=PersonalityInterface.create_admin_menu()
+                )
+                bot.answer_callback_query(call.id, "📊 Dashboard admin")
+            else:
+                bot.answer_callback_query(call.id, "🚫 Accès refusé")
+        
+        elif call.data == "admin_all_users":
+            if UserManager.is_owner(user_id):
+                all_users = db.get_all_users()
+                
+                users_text = "👥 **TOUS LES UTILISATEURS**\n\n"
+                for i, user in enumerate(all_users[:10], 1):
+                    premium = "💎" if user['is_premium'] else "🔓"
+                    username = f"@{user['username']}" if user['username'] else "Sans username"
+                    users_text += f"{i}. {premium} {user['first_name']} ({username}) - {user['message_count']} msgs\n"
+                
+                if len(all_users) > 10:
+                    users_text += f"\n... et {len(all_users) - 10} autres utilisateurs"
+                
+                bot.edit_message_text(
+                    users_text,
+                    chat_id,
+                    message_id,
+                    parse_mode='Markdown',
+                    reply_markup=PersonalityInterface.create_admin_menu()
+                )
+                bot.answer_callback_query(call.id, "👥 Liste utilisateurs")
+            else:
+                bot.answer_callback_query(call.id, "🚫 Accès refusé")
+        
+        elif call.data == "admin_premium_users":
+            if UserManager.is_owner(user_id):
+                premium_users = db.get_premium_users()
+                
+                if premium_users:
+                    premium_text = "💎 **MEMBRES PREMIUM**\n\n"
+                    for i, user in enumerate(premium_users, 1):
+                        username = f"@{user['username']}" if user['username'] else "Sans username"
+                        premium_text += f"{i}. {user['first_name']} ({username}) - {user['message_count']} msgs\n"
+                else:
+                    premium_text = "💎 **Aucun membre premium**"
+                
+                bot.edit_message_text(
+                    premium_text,
+                    chat_id,
+                    message_id,
+                    parse_mode='Markdown',
+                    reply_markup=PersonalityInterface.create_admin_menu()
+                )
+                bot.answer_callback_query(call.id, "💎 Liste premium")
+            else:
+                bot.answer_callback_query(call.id, "🚫 Accès refusé")
+        
+        elif call.data == "admin_premium_all":
+            if UserManager.is_owner(user_id):
+                new_premium_count = db.set_all_premium(30)
+                
+                bot.edit_message_text(
+                    f"🎁 **Premium activé pour tous !**\n\n{new_premium_count} nouveaux utilisateurs premium",
+                    chat_id,
+                    message_id,
+                    parse_mode='Markdown',
+                    reply_markup=PersonalityInterface.create_admin_menu()
+                )
+                bot.answer_callback_query(call.id, "🎁 Premium pour tous")
+            else:
+                bot.answer_callback_query(call.id, "🚫 Accès refusé")
+        
+        elif call.data == "admin_remove_all_premium":
+            if UserManager.is_owner(user_id):
+                removed_count = db.remove_all_premium()
+                
+                bot.edit_message_text(
+                    f"🚫 **Premium retiré pour tous !**\n\n{removed_count} utilisateurs affectés",
+                    chat_id,
+                    message_id,
+                    parse_mode='Markdown',
+                    reply_markup=PersonalityInterface.create_admin_menu()
+                )
+                bot.answer_callback_query(call.id, "🚫 Premium retiré")
+            else:
+                bot.answer_callback_query(call.id, "🚫 Accès refusé")
+        
+        elif call.data == "admin_personalities":
+            if UserManager.is_owner(user_id):
+                all_users = db.get_all_users()
+                personality_count = {}
+                
+                for user in all_users:
+                    personality = user.get('personality', 'amour')
+                    personality_count[personality] = personality_count.get(personality, 0) + 1
+                
+                personalities_text = "🎭 **STATISTIQUES PERSONNALITÉS**\n\n"
+                for personality, count in personality_count.items():
+                    personality_config = PersonalitySystem.get_personality_config(personality)
+                    personalities_text += f"{personality_config['emoji']} {personality_config['name']}: {count} utilisateurs\n"
+                
+                bot.edit_message_text(
+                    personalities_text,
+                    chat_id,
+                    message_id,
+                    parse_mode='Markdown',
+                    reply_markup=PersonalityInterface.create_admin_menu()
+                )
+                bot.answer_callback_query(call.id, "🎭 Stats personnalités")
+            else:
+                bot.answer_callback_query(call.id, "🚫 Accès refusé")
+        
+        elif call.data == "admin_refresh":
+            if UserManager.is_owner(user_id):
+                stats = db.get_stats()
+                
+                bot.edit_message_text(
+                    f"🔄 **Tableau de bord actualisé**\n\n👥 Utilisateurs: {stats['total_users']}\n💎 Premium: {stats['premium_users']}",
+                    chat_id,
+                    message_id,
+                    parse_mode='Markdown',
+                    reply_markup=PersonalityInterface.create_admin_menu()
+                )
+                bot.answer_callback_query(call.id, "🔄 Actualisé")
+            else:
+                bot.answer_callback_query(call.id, "🚫 Accès refusé")
 
     except Exception as e:
         print(f"💔 Erreur callback: {e}")
-        bot.answer_callback_query(call.id, "💔 Petit problème...")
+        bot.answer_callback_query(call.id, "💔 Erreur, réessayez")
 
 @bot.message_handler(func=lambda message: True)
 def message_handler(message):
-    """Gestion de tous les messages avec personnalité"""
     if message.chat.type in ['group', 'supergroup']:
         return
         
@@ -1085,22 +1171,18 @@ def message_handler(message):
     if len(user_message) < 2:
         return
     
-    # Enregistrer l'utilisateur
     UserManager.register_user(user_id, 
                              message.from_user.username or "Ami", 
                              message.from_user.first_name or "Ami précieux")
     
-    # Traitement IA avec personnalité
     bot.send_chat_action(message.chat.id, 'typing')
     
     ai_response = ai_engine.process_message(user_id, user_message, message.chat.id)
     
-    # Envoyer la réponse avec la photo de personnalité
     personality = ai_engine.get_user_personality(user_id)
     personality_config = PersonalitySystem.get_personality_config(personality)
     
     try:
-        # Essayer d'envoyer avec photo d'abord
         bot.send_photo(
             message.chat.id,
             personality_config["photo"],
@@ -1109,7 +1191,6 @@ def message_handler(message):
             reply_to_message_id=message.message_id
         )
     except:
-        # Fallback: envoyer juste le texte si la photo échoue
         bot.reply_to(
             message, 
             f"{personality_config['emoji']} **{personality_config['name']}**\n\n{ai_response}",
@@ -1118,36 +1199,39 @@ def message_handler(message):
 
 # ==================== DÉMARRAGE ====================
 if __name__ == "__main__":
-    print("🎭 INITIALISATION DE NOVAAI MULTI-PERSONNALITÉS AVEC VOICE...")
+    print("🎭 NOVAAI MULTI-PERSONNALITÉS - TOUS LES BOUTONS CORRIGÉS...")
     
     user_count = CounterSystem.load()
     stats = db.get_stats()
     
     print(f"""
-✨ SYSTÈME MULTI-PERSONNALITÉS AVEC VOICE OPÉRATIONNEL
+✨ SYSTÈME MULTI-PERSONNALITÉS OPÉRATIONNEL
 
-📊 NOTRE FAMILLE :
-   • Âmes connectées: {stats['total_users'] if stats else 0}
-   • Membres privilégiés: {stats['premium_users'] if stats else 0}
-   • Messages échangés: {stats['total_messages'] if stats else 0}
-   • Version: {Config.VERSION}
-   • Personnalités: 3 modes disponibles
-   • Voice Messages: Activés
-   • Photos Personnalisées: Activées
+📊 STATISTIQUES:
+   • Utilisateurs: {stats['total_users'] if stats else 0}
+   • Premium: {stats['premium_users'] if stats else 0}
+   • Messages: {stats['total_messages'] if stats else 0}
 
-🎛️  COMMANDES :
-   • /start - Menu principal avec voice
-   • /personality - Changer de personnalité
-   • /voice - Réécouter la voice message
-   • /photo - Voir la photo de personnalité
-   • /stats - Statistiques personnalisées
-   • /admin - Panel administrateur
+🎛️ COMMANDES DISPONIBLES:
+   • /start - Menu principal
+   • /personality - Changer personnalité  
+   • /voice - Message vocal
+   • /photo - Photo personnalité
+   • /stats - Statistiques
 
-🤖 EN ATTENTE DE MESSAGES AVEC 3 PERSONNALITÉS...
+🔘 BOUTONS FONCTIONNELS:
+   ✅ Changement de personnalité
+   ✅ Messages vocaux
+   ✅ Statistiques
+   ✅ Info Premium
+   ✅ Menu admin complet
+   ✅ Retour au menu
+
+🤖 EN ATTENTE DE MESSAGES...
     """)
     
     try:
         bot.infinity_polling()
     except Exception as e:
-        print(f"💔 ERREUR CRITIQUE: {e}")
+        print(f"💔 ERREUR: {e}")
         time.sleep(5)
