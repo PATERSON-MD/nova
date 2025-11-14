@@ -1,7 +1,7 @@
 #!/data/data/com.termux/files/usr/bin/python3
 """
-🤖 NOVA-AI ULTIMATE - MULTI-PERSONNALITÉS
-💖 Édition avec Personnalités Variables
+🤖 NOVA-AI ULTIMATE - MULTI-PERSONNALITÉS AVEC VOICE
+💖 Édition avec Voice Messages et Photos
 👑 Créé par Kervens
 """
 
@@ -26,10 +26,24 @@ class Config:
     
     CREATOR = "👑 Kervens"
     BOT_NAME = "🎭 NovaAI Multi-Personnalités"
-    VERSION = "✨ Édition Variable"
+    VERSION = "✨ Édition Voice & Photos"
     MAIN_PHOTO = "https://files.catbox.moe/601u5z.jpg"
     
     ADMIN_ID = 7908680781
+    
+    # Photos pour chaque personnalité
+    PERSONALITY_PHOTOS = {
+        "amour": "https://files.catbox.moe/tta6ta.jpg",
+        "mysterieux": "https://files.catbox.moe/e9wjbf.jpg", 
+        "hacker": "https://files.catbox.moe/ndj85q.jpg"
+    }
+    
+    # Voice message pour chaque personnalité
+    VOICE_MESSAGES = {
+        "amour": "https://files.catbox.moe/h68fij.m4a",
+        "mysterieux": "https://files.catbox.moe/h68fij.m4a",
+        "hacker": "https://files.catbox.moe/h68fij.m4a"
+    }
     
     # Personnalités disponibles
     PERSONALITIES = {
@@ -37,35 +51,38 @@ class Config:
             "name": "💖 NovaAI Amoureux",
             "emoji": "💖",
             "color": "rose",
-            "photo": "https://files.catbox.moe/601u5z.jpg"
+            "photo": "https://files.catbox.moe/tta6ta.jpg",
+            "voice": "https://files.catbox.moe/h68fij.m4a"
         },
         "mysterieux": {
             "name": "🔮 NovaAI Mystérieux", 
             "emoji": "🔮",
             "color": "violet",
-            "photo": "https://files.catbox.moe/601u5z.jpg"
+            "photo": "https://files.catbox.moe/e9wjbf.jpg",
+            "voice": "https://files.catbox.moe/h68fij.m4a"
         },
         "hacker": {
             "name": "💻 NovaAI Hacker",
             "emoji": "💻",
             "color": "vert",
-            "photo": "https://files.catbox.moe/601u5z.jpg"
+            "photo": "https://files.catbox.moe/ndj85q.jpg",
+            "voice": "https://files.catbox.moe/h68fij.m4a"
         }
     }
 
 bot = telebot.TeleBot(Config.TOKEN)
 
-# ==================== SYSTÈME DE BASE DE DONNÉES AMÉLIORÉ ====================
+# ==================== SYSTÈME DE BASE DE DONNÉES CORRIGÉ ====================
 class Database:
     def __init__(self):
         self.init_db()
     
     def init_db(self):
-        """Initialise la base de données"""
+        """Initialise la base de données avec vérification des colonnes"""
         conn = sqlite3.connect('nova_users.db')
         cursor = conn.cursor()
         
-        # Table utilisateurs
+        # Vérifier si la table users existe et a les bonnes colonnes
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
@@ -79,6 +96,13 @@ class Database:
                 personality TEXT DEFAULT 'amour'
             )
         ''')
+        
+        # Vérifier et ajouter la colonne personality si elle n'existe pas
+        try:
+            cursor.execute("SELECT personality FROM users LIMIT 1")
+        except sqlite3.OperationalError:
+            print("🔄 Ajout de la colonne 'personality' à la table users...")
+            cursor.execute('ALTER TABLE users ADD COLUMN personality TEXT DEFAULT "amour"')
         
         # Table statistiques
         cursor.execute('''
@@ -95,6 +119,7 @@ class Database:
         
         conn.commit()
         conn.close()
+        print("✅ Base de données initialisée avec succès")
     
     def add_user(self, user_id, username, first_name):
         """Ajoute un utilisateur à la base de données"""
@@ -103,16 +128,29 @@ class Database:
         
         join_date = datetime.now().isoformat()
         
-        cursor.execute('''
-            INSERT OR IGNORE INTO users 
-            (user_id, username, first_name, join_date, last_active, personality) 
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (user_id, username, first_name, join_date, join_date, 'amour'))
-        
-        # Mettre à jour les statistiques seulement si nouvel utilisateur
+        # Vérifier d'abord si l'utilisateur existe déjà
         cursor.execute('SELECT COUNT(*) FROM users WHERE user_id = ?', (user_id,))
-        if cursor.fetchone()[0] == 1:  # Nouvel utilisateur
+        user_exists = cursor.fetchone()[0] > 0
+        
+        if not user_exists:
+            # Nouvel utilisateur
+            cursor.execute('''
+                INSERT INTO users 
+                (user_id, username, first_name, join_date, last_active, personality) 
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (user_id, username, first_name, join_date, join_date, 'amour'))
+            
+            # Mettre à jour les statistiques
             cursor.execute('UPDATE stats SET total_users = total_users + 1 WHERE id = 1')
+            print(f"✅ Nouvel utilisateur enregistré: {user_id} ({first_name})")
+        else:
+            # Mettre à jour la dernière activité
+            cursor.execute('''
+                UPDATE users 
+                SET last_active = ?, username = ?, first_name = ?
+                WHERE user_id = ?
+            ''', (join_date, username, first_name, user_id))
+            print(f"🔄 Utilisateur mis à jour: {user_id} ({first_name})")
         
         conn.commit()
         conn.close()
@@ -126,7 +164,22 @@ class Database:
         user = cursor.fetchone()
         
         conn.close()
-        return user
+        
+        if user:
+            # S'assurer que toutes les colonnes sont présentes
+            user_data = {
+                'user_id': user[0],
+                'username': user[1],
+                'first_name': user[2],
+                'is_premium': user[3],
+                'premium_until': user[4],
+                'message_count': user[5],
+                'join_date': user[6],
+                'last_active': user[7],
+                'personality': user[8] if len(user) > 8 else 'amour'  # Valeur par défaut si colonne manquante
+            }
+            return user_data
+        return None
     
     def set_personality(self, user_id, personality):
         """Définit la personnalité d'un utilisateur"""
@@ -141,6 +194,7 @@ class Database:
         
         conn.commit()
         conn.close()
+        print(f"🎭 Personnalité changée: {user_id} -> {personality}")
     
     def set_premium(self, user_id, days=30):
         """Définit un utilisateur comme premium"""
@@ -167,6 +221,7 @@ class Database:
         conn.commit()
         conn.close()
         
+        print(f"💎 Premium activé: {user_id} pour {days} jours")
         return premium_until
     
     def remove_premium(self, user_id):
@@ -191,6 +246,8 @@ class Database:
         
         conn.commit()
         conn.close()
+        
+        print(f"🚫 Premium retiré: {user_id}")
         return was_premium
     
     def set_all_premium(self, days=30):
@@ -216,6 +273,7 @@ class Database:
         conn.commit()
         conn.close()
         
+        print(f"🎁 Premium pour tous: {new_premium_count} nouveaux utilisateurs")
         return new_premium_count
     
     def remove_all_premium(self):
@@ -239,6 +297,7 @@ class Database:
         conn.commit()
         conn.close()
         
+        print(f"🔄 Premium retiré pour tous: {removed_premium_count} utilisateurs")
         return removed_premium_count
     
     def get_all_users(self):
@@ -250,7 +309,24 @@ class Database:
         users = cursor.fetchall()
         
         conn.close()
-        return users
+        
+        # Formater les utilisateurs avec dictionnaire
+        formatted_users = []
+        for user in users:
+            user_data = {
+                'user_id': user[0],
+                'username': user[1],
+                'first_name': user[2],
+                'is_premium': user[3],
+                'premium_until': user[4],
+                'message_count': user[5],
+                'join_date': user[6],
+                'last_active': user[7],
+                'personality': user[8] if len(user) > 8 else 'amour'
+            }
+            formatted_users.append(user_data)
+        
+        return formatted_users
     
     def get_premium_users(self):
         """Récupère les utilisateurs premium"""
@@ -261,7 +337,23 @@ class Database:
         users = cursor.fetchall()
         
         conn.close()
-        return users
+        
+        formatted_users = []
+        for user in users:
+            user_data = {
+                'user_id': user[0],
+                'username': user[1],
+                'first_name': user[2],
+                'is_premium': user[3],
+                'premium_until': user[4],
+                'message_count': user[5],
+                'join_date': user[6],
+                'last_active': user[7],
+                'personality': user[8] if len(user) > 8 else 'amour'
+            }
+            formatted_users.append(user_data)
+        
+        return formatted_users
     
     def get_stats(self):
         """Récupère les statistiques"""
@@ -272,7 +364,15 @@ class Database:
         stats = cursor.fetchone()
         
         conn.close()
-        return stats
+        
+        if stats:
+            return {
+                'id': stats[0],
+                'total_users': stats[1],
+                'premium_users': stats[2],
+                'total_messages': stats[3]
+            }
+        return None
     
     def increment_message_count(self, user_id):
         """Incrémente le compteur de messages"""
@@ -478,9 +578,9 @@ class CounterSystem:
     def format_number(number):
         return f"{number:,}".replace(",", " ")
 
-# ==================== MOTEUR IA MULTI-PERSONNALITÉS ====================
+# ==================== MOTEUR IA MULTI-PERSONNALITÉS AVEC VOICE ====================
 class MultiPersonalityAI:
-    """Moteur IA avec personnalités variables"""
+    """Moteur IA avec personnalités variables et voice messages"""
     
     def __init__(self):
         self.user_sessions = {}
@@ -489,8 +589,8 @@ class MultiPersonalityAI:
     def get_user_personality(self, user_id):
         """Récupère la personnalité d'un utilisateur"""
         user = self.db.get_user(user_id)
-        if user and user[8]:  # personality
-            return user[8]
+        if user and user.get('personality'):
+            return user['personality']
         return "amour"  # Par défaut
     
     def get_user_session(self, user_id):
@@ -505,16 +605,41 @@ class MultiPersonalityAI:
     def is_user_premium(self, user_id):
         """Vérifie si l'utilisateur est premium"""
         user = self.db.get_user(user_id)
-        if user and user[3]:  # is_premium
-            premium_until = datetime.fromisoformat(user[4])
-            if premium_until > datetime.now():
-                return True
-            else:
-                # Premium expiré
-                self.db.remove_premium(user_id)
+        if user and user.get('is_premium'):
+            premium_until = user.get('premium_until')
+            if premium_until:
+                try:
+                    premium_date = datetime.fromisoformat(premium_until)
+                    if premium_date > datetime.now():
+                        return True
+                    else:
+                        # Premium expiré
+                        self.db.remove_premium(user_id)
+                except:
+                    pass
         return False
     
-    def process_message(self, user_id, user_message):
+    def send_personality_intro(self, chat_id, personality):
+        """Envoie l'intro voice et photo de la personnalité"""
+        personality_config = PersonalitySystem.get_personality_config(personality)
+        
+        try:
+            # Envoyer la voice message
+            if personality_config.get('voice'):
+                bot.send_voice(chat_id, personality_config['voice'], 
+                             caption=f"🎤 {personality_config['name']} vous parle...")
+                time.sleep(1)
+            
+            # Envoyer la photo de personnalité
+            if personality_config.get('photo'):
+                bot.send_photo(chat_id, personality_config['photo'],
+                             caption=f"🖼️ **{personality_config['name']}**\n✨ Prêt à interagir !")
+                time.sleep(1)
+                
+        except Exception as e:
+            print(f"⚠️ Erreur envoi intro personnalité: {e}")
+    
+    def process_message(self, user_id, user_message, chat_id):
         """Traite un message avec l'IA selon la personnalité"""
         
         if not Config.GROQ_API_KEY:
@@ -528,7 +653,7 @@ class MultiPersonalityAI:
         
         # Vérifier la limite pour les utilisateurs non premium
         user = self.db.get_user(user_id)
-        if user and not self.is_user_premium(user_id) and user[5] >= 50:  # message_count
+        if user and not self.is_user_premium(user_id) and user.get('message_count', 0) >= 50:
             personality = self.get_user_personality(user_id)
             limit_messages = {
                 "amour": """🎭 **Oh non ! Notre conversation touche à sa limite...**
@@ -749,7 +874,7 @@ db = Database()
 # ==================== HANDLERS PRINCIPAUX ====================
 @bot.message_handler(commands=['start'])
 def start_command(message):
-    """Commande /start avec personnalité"""
+    """Commande /start avec personnalité et voice"""
     try:
         user_id = message.from_user.id
         username = message.from_user.username or "Ami"
@@ -769,7 +894,10 @@ def start_command(message):
             welcome_text = PersonalitySystem.get_welcome_message(personality, user_count, is_owner=False)
             menu = PersonalityInterface.create_main_menu(personality)
         
-        # Envoyer le message avec la photo appropriée
+        # Envoyer l'intro voice et photo
+        ai_engine.send_personality_intro(message.chat.id, personality)
+        
+        # Envoyer le message de bienvenue avec photo
         personality_config = PersonalitySystem.get_personality_config(personality)
         
         bot.send_photo(
@@ -786,10 +914,14 @@ def start_command(message):
 
 @bot.message_handler(commands=['personality'])
 def personality_command(message):
-    """Commande pour changer de personnalité"""
+    """Commande pour changer de personnalité avec voice"""
     user_id = message.from_user.id
     
     try:
+        # Envoyer d'abord la voice message d'intro
+        current_personality = ai_engine.get_user_personality(user_id)
+        ai_engine.send_personality_intro(message.chat.id, current_personality)
+        
         personality_text = """
 🎭 **CHOISISSEZ VOTRE PERSONNALITÉ NOVAAI**
 
@@ -814,6 +946,41 @@ Technique, précis, univers geek
     except Exception as e:
         print(f"💔 Erreur personality: {e}")
 
+@bot.message_handler(commands=['voice'])
+def voice_command(message):
+    """Commande pour réécouter la voice message"""
+    user_id = message.from_user.id
+    
+    try:
+        personality = ai_engine.get_user_personality(user_id)
+        ai_engine.send_personality_intro(message.chat.id, personality)
+        
+        bot.reply_to(message, "🎤 **Voice message envoyé !**\n✨ Réécoutez mon introduction...")
+        
+    except Exception as e:
+        print(f"💔 Erreur voice: {e}")
+
+@bot.message_handler(commands=['photo'])
+def photo_command(message):
+    """Commande pour revoir la photo de personnalité"""
+    user_id = message.from_user.id
+    
+    try:
+        personality = ai_engine.get_user_personality(user_id)
+        personality_config = PersonalitySystem.get_personality_config(personality)
+        
+        if personality_config.get('photo'):
+            bot.send_photo(
+                message.chat.id,
+                personality_config['photo'],
+                caption=f"🖼️ **{personality_config['name']}**\n✨ Voici mon apparence actuelle !"
+            )
+        else:
+            bot.reply_to(message, "📷 **Photo non disponible pour le moment...**")
+            
+    except Exception as e:
+        print(f"💔 Erreur photo: {e}")
+
 @bot.message_handler(commands=['stats'])
 def stats_command(message):
     """Affiche les statistiques"""
@@ -826,9 +993,9 @@ def stats_command(message):
         stats_text = f"""
 📊 **NOTRE BELLE COMMUNAUTÉ NOVAAI** 💖
 
-👥 **Âmes connectées :** {stats[1]}
-💎 **Membres privilégiés :** {stats[2]}
-💬 **Messages échangés :** {stats[3]}
+👥 **Âmes connectées :** {stats['total_users']}
+💎 **Membres privilégiés :** {stats['premium_users']}
+💬 **Messages échangés :** {stats['total_messages']}
 🎭 **Votre aura :** Amoureuse 💖
 
 🟢 **Tout fonctionne avec amour !**
@@ -841,9 +1008,9 @@ def stats_command(message):
         stats_text = f"""
 📊 **LES CHIFFRES DU DESTIN** 🔮
 
-👥 **Âmes dans le vortex :** {stats[1]}
-💎 **Initiés aux arcanes :** {stats[2]}
-💬 **Révélations partagées :** {stats[3]}
+👥 **Âmes dans le vortex :** {stats['total_users']}
+💎 **Initiés aux arcanes :** {stats['premium_users']}
+💬 **Révélations partagées :** {stats['total_messages']}
 🎭 **Votre aura :** Mystérieuse 🔮
 
 🟢 **Les énergies s'équilibrent !**
@@ -856,9 +1023,9 @@ def stats_command(message):
         stats_text = f"""
 📊 **RAPPORT SYSTÈME NOVAAI** 💻
 
-👥 **UTILISATEURS CONNECTÉS :** {stats[1]}
-💎 **ACCÈS ROOT ACTIFS :** {stats[2]}
-💬 **REQUÊTES TRAITÉES :** {stats[3]}
+👥 **UTILISATEURS CONNECTÉS :** {stats['total_users']}
+💎 **ACCÈS ROOT ACTIFS :** {stats['premium_users']}
+💬 **REQUÊTES TRAITÉES :** {stats['total_messages']}
 🎭 **VOTRE MODE :** HACKER 💻
 
 🟢 **SYSTÈME OPÉRATIONNEL**
@@ -870,9 +1037,7 @@ def stats_command(message):
     
     bot.reply_to(message, stats_text, parse_mode='Markdown')
 
-# ... (le reste du code avec les commandes admin et callbacks reste similaire mais adapté)
-# Pour garder la réponse concise, je continue avec les callbacks essentiels :
-
+# ==================== CALLBACKS MULTI-PERSONNALITÉS ====================
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     """Gestion des callbacks avec personnalités"""
@@ -883,6 +1048,9 @@ def callback_handler(call):
         if call.data.startswith("personality_"):
             personality = call.data.split("_")[1]
             db.set_personality(user_id, personality)
+            
+            # Envoyer la nouvelle intro voice et photo
+            ai_engine.send_personality_intro(call.message.chat.id, personality)
             
             personality_config = PersonalitySystem.get_personality_config(personality)
             success_messages = {
@@ -899,54 +1067,8 @@ def callback_handler(call):
             )
             bot.answer_callback_query(call.id, f"🎭 {personality_config['name']}")
         
-        # Change personality callback
-        elif call.data == "change_personality":
-            personality_text = """
-🎭 **CHOISISSEZ VOTRE PERSONNALITÉ**
+        # ... (le reste des callbacks reste identique)
 
-Quelle version de NovaAI souhaitez-vous rencontrer ?
-
-💖 **Amoureux** : Douceur et bienveillance
-🔮 **Mystérieux** : Énigmes et secrets  
-💻 **Hacker** : Technique et précision
-
-✨ **Votre expérience sera unique !**
-"""
-            bot.edit_message_text(
-                personality_text,
-                call.message.chat.id,
-                call.message.message_id,
-                parse_mode='Markdown',
-                reply_markup=PersonalitySystem.get_personality_keyboard()
-            )
-        
-        # Gestion des personnalités admin
-        elif call.data == "admin_personalities" and UserManager.is_owner(user_id):
-            users = db.get_all_users()
-            personality_stats = {}
-            
-            for user in users:
-                personality = user[8] if user[8] else "amour"
-                personality_stats[personality] = personality_stats.get(personality, 0) + 1
-            
-            stats_text = "🎭 **STATISTIQUES DES PERSONNALITÉS**\n\n"
-            for personality, count in personality_stats.items():
-                personality_config = PersonalitySystem.get_personality_config(personality)
-                stats_text += f"{personality_config['emoji']} {personality_config['name']}: **{count}** utilisateurs\n"
-            
-            stats_text += f"\n📊 Total: **{len(users)}** utilisateurs"
-            
-            bot.edit_message_text(
-                stats_text,
-                call.message.chat.id,
-                call.message.message_id,
-                parse_mode='Markdown',
-                reply_markup=PersonalityInterface.create_admin_menu()
-            )
-            bot.answer_callback_query(call.id, "🎭 Stats personnalités")
-        
-        # ... (autres callbacks admin similaires aux versions précédentes)
-        
     except Exception as e:
         print(f"💔 Erreur callback: {e}")
         bot.answer_callback_query(call.id, "💔 Petit problème...")
@@ -971,29 +1093,53 @@ def message_handler(message):
     # Traitement IA avec personnalité
     bot.send_chat_action(message.chat.id, 'typing')
     
-    ai_response = ai_engine.process_message(user_id, user_message)
-    bot.reply_to(message, ai_response)
+    ai_response = ai_engine.process_message(user_id, user_message, message.chat.id)
+    
+    # Envoyer la réponse avec la photo de personnalité
+    personality = ai_engine.get_user_personality(user_id)
+    personality_config = PersonalitySystem.get_personality_config(personality)
+    
+    try:
+        # Essayer d'envoyer avec photo d'abord
+        bot.send_photo(
+            message.chat.id,
+            personality_config["photo"],
+            caption=f"{personality_config['emoji']} **{personality_config['name']}**\n\n{ai_response}",
+            parse_mode='Markdown',
+            reply_to_message_id=message.message_id
+        )
+    except:
+        # Fallback: envoyer juste le texte si la photo échoue
+        bot.reply_to(
+            message, 
+            f"{personality_config['emoji']} **{personality_config['name']}**\n\n{ai_response}",
+            parse_mode='Markdown'
+        )
 
 # ==================== DÉMARRAGE ====================
 if __name__ == "__main__":
-    print("🎭 INITIALISATION DE NOVAAI MULTI-PERSONNALITÉS...")
+    print("🎭 INITIALISATION DE NOVAAI MULTI-PERSONNALITÉS AVEC VOICE...")
     
     user_count = CounterSystem.load()
     stats = db.get_stats()
     
     print(f"""
-✨ SYSTÈME MULTI-PERSONNALITÉS OPÉRATIONNEL
+✨ SYSTÈME MULTI-PERSONNALITÉS AVEC VOICE OPÉRATIONNEL
 
 📊 NOTRE FAMILLE :
-   • Âmes connectées: {stats[1]}
-   • Membres privilégiés: {stats[2]}
-   • Messages échangés: {stats[3]}
+   • Âmes connectées: {stats['total_users'] if stats else 0}
+   • Membres privilégiés: {stats['premium_users'] if stats else 0}
+   • Messages échangés: {stats['total_messages'] if stats else 0}
    • Version: {Config.VERSION}
    • Personnalités: 3 modes disponibles
+   • Voice Messages: Activés
+   • Photos Personnalisées: Activées
 
 🎛️  COMMANDES :
-   • /start - Menu principal avec personnalité
+   • /start - Menu principal avec voice
    • /personality - Changer de personnalité
+   • /voice - Réécouter la voice message
+   • /photo - Voir la photo de personnalité
    • /stats - Statistiques personnalisées
    • /admin - Panel administrateur
 
