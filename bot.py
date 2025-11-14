@@ -1,7 +1,7 @@
 #!/data/data/com.termux/files/usr/bin/python3
 """
-🤖 NOVA-AI ULTIMATE - VERSION SANS ERREURS
-💖 Tous les boutons fonctionnent parfaitement
+🤖 NOVA-AI ULTIMATE - VERSION MAÎTRE
+💖 Contrôle 100% Propriétaire + Voice Réels + Groupes
 👑 Créé par Kervens
 """
 
@@ -12,161 +12,322 @@ import sqlite3
 import json
 import time
 import random
+import logging
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
+
+# Configuration du logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-# ==================== CONFIGURATION ====================
+# ==================== CONFIGURATION MAÎTRE ====================
 class Config:
     TOKEN = os.getenv('TELEGRAM_TOKEN')
     GROQ_API_KEY = os.getenv('GROQ_API_KEY')
     GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
     
-    ADMIN_ID = 7908680781
+    # MAÎTRE SUPRÊME - Vous avez le contrôle total
+    MASTER_ID = 7908680781  # Votre ID
+    ADMIN_IDS = [7908680781]  # Vous seul êtes admin
     
-    # Musique pour chaque personnalité
-    MUSIC_URLS = {
+    # Voice messages réels
+    VOICE_MESSAGES = {
         "amour": "https://files.catbox.moe/h68fij.m4a",
         "mysterieux": "https://files.catbox.moe/h68fij.m4a", 
         "hacker": "https://files.catbox.moe/h68fij.m4a"
     }
     
-    # Photos pour chaque personnalité
+    # Photos personnalités
     PERSONALITY_PHOTOS = {
         "amour": "https://files.catbox.moe/tta6ta.jpg",
         "mysterieux": "https://files.catbox.moe/e9wjbf.jpg", 
         "hacker": "https://files.catbox.moe/ndj85q.jpg"
     }
     
-    # Personnalités disponibles
+    # Système de personnalités
     PERSONALITIES = {
         "amour": {
             "name": "💖 NovaAI Amoureux",
             "emoji": "💖",
             "photo": "https://files.catbox.moe/tta6ta.jpg",
-            "music": "https://files.catbox.moe/h68fij.m4a",
-            "voice_text": "💖 Bonjour mon ami ! Je suis NovaAI Amoureux, toujours là pour toi avec tendresse et bienveillance."
+            "voice": "https://files.catbox.moe/h68fij.m4a",
+            "style": "chaleureux et bienveillant"
         },
         "mysterieux": {
             "name": "🔮 NovaAI Mystérieux", 
             "emoji": "🔮",
             "photo": "https://files.catbox.moe/e9wjbf.jpg",
-            "music": "https://files.catbox.moe/h68fij.m4a",
-            "voice_text": "🔮 Bienvenue dans le sanctuaire des mystères... Les étoiles murmurent tes secrets."
+            "voice": "https://files.catbox.moe/h68fij.m4a",
+            "style": "énigmatique et profond"
         },
         "hacker": {
             "name": "💻 NovaAI Hacker",
             "emoji": "💻",
             "photo": "https://files.catbox.moe/ndj85q.jpg",
-            "music": "https://files.catbox.moe/h68fij.m4a",
-            "voice_text": "💻 Système NovaAI en mode hacker. Connexion établie. Prêt à recevoir vos commandes."
+            "voice": "https://files.catbox.moe/h68fij.m4a",
+            "style": "technique et direct"
         }
     }
 
-bot = telebot.TeleBot(Config.TOKEN)
+bot = telebot.TeleBot(Config.TOKEN, parse_mode='HTML')
 
-# ==================== BASE DE DONNÉES SIMPLIFIÉE ====================
-class Database:
-    def __init__(self):
-        self.conn = sqlite3.connect('nova_users.db', check_same_thread=False)
-        self.init_db()
+# ==================== SYSTÈME ANTI-BUGS ====================
+class AntiBugSystem:
+    @staticmethod
+    def safe_execute(func, *args, **kwargs):
+        """Exécute une fonction de manière sécurisée"""
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            logger.error(f"Erreur dans {func.__name__}: {e}")
+            return None
     
-    def init_db(self):
+    @staticmethod
+    def rate_limit(user_id, action, limit=5, window=60):
+        """Système de limitation de requêtes"""
+        current_time = time.time()
+        key = f"{user_id}_{action}"
+        
+        if not hasattr(AntiBugSystem, 'rate_limits'):
+            AntiBugSystem.rate_limits = {}
+        
+        if key not in AntiBugSystem.rate_limits:
+            AntiBugSystem.rate_limits[key] = []
+        
+        # Nettoyer les vieilles requêtes
+        AntiBugSystem.rate_limits[key] = [t for t in AntiBugSystem.rate_limits[key] if current_time - t < window]
+        
+        if len(AntiBugSystem.rate_limits[key]) >= limit:
+            return False
+        
+        AntiBugSystem.rate_limits[key].append(current_time)
+        return True
+
+# ==================== BASE DE DONNÉES RENFORCÉE ====================
+class MasterDatabase:
+    def __init__(self):
+        self.conn = sqlite3.connect('master_nova.db', check_same_thread=False)
+        self.init_database()
+    
+    def init_database(self):
         cursor = self.conn.cursor()
+        
+        # Table utilisateurs
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
                 username TEXT,
                 first_name TEXT,
                 is_premium INTEGER DEFAULT 0,
+                is_banned INTEGER DEFAULT 0,
                 message_count INTEGER DEFAULT 0,
                 join_date TEXT,
-                personality TEXT DEFAULT 'amour'
+                last_active TEXT,
+                personality TEXT DEFAULT 'amour',
+                user_type TEXT DEFAULT 'user'
             )
         ''')
-        self.conn.commit()
-    
-    def add_user(self, user_id, username, first_name):
-        cursor = self.conn.cursor()
-        join_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
+        # Table groupes
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS groups (
+                group_id INTEGER PRIMARY KEY,
+                title TEXT,
+                is_active INTEGER DEFAULT 1,
+                added_date TEXT
+            )
+        ''')
+        
+        # Table statistiques maître
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS master_stats (
+                id INTEGER PRIMARY KEY,
+                total_users INTEGER DEFAULT 0,
+                total_groups INTEGER DEFAULT 0,
+                total_messages INTEGER DEFAULT 0,
+                last_reset TEXT
+            )
+        ''')
+        
+        # Insérer les stats initiales
+        cursor.execute('INSERT OR IGNORE INTO master_stats (id, total_users, total_groups, total_messages) VALUES (1, 0, 0, 0)')
+        
+        self.conn.commit()
+        logger.info("Base de données maître initialisée")
+    
+    def add_user(self, user_id, username, first_name, user_type="user"):
+        return AntiBugSystem.safe_execute(self._add_user, user_id, username, first_name, user_type)
+    
+    def _add_user(self, user_id, username, first_name, user_type="user"):
+        cursor = self.conn.cursor()
+        join_date = datetime.now().isoformat()
+        
+        cursor.execute('SELECT user_id FROM users WHERE user_id = ?', (user_id,))
         if not cursor.fetchone():
             cursor.execute('''
-                INSERT INTO users (user_id, username, first_name, join_date) 
-                VALUES (?, ?, ?, ?)
-            ''', (user_id, username, first_name, join_date))
+                INSERT INTO users (user_id, username, first_name, join_date, last_active, user_type) 
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (user_id, username, first_name, join_date, join_date, user_type))
+            
+            # Mettre à jour les stats
+            cursor.execute('UPDATE master_stats SET total_users = total_users + 1 WHERE id = 1')
             self.conn.commit()
+            logger.info(f"Nouvel utilisateur: {user_id} ({first_name})")
+            return True
+        return False
+    
+    def add_group(self, group_id, title):
+        return AntiBugSystem.safe_execute(self._add_group, group_id, title)
+    
+    def _add_group(self, group_id, title):
+        cursor = self.conn.cursor()
+        added_date = datetime.now().isoformat()
+        
+        cursor.execute('SELECT group_id FROM groups WHERE group_id = ?', (group_id,))
+        if not cursor.fetchone():
+            cursor.execute('''
+                INSERT INTO groups (group_id, title, added_date) 
+                VALUES (?, ?, ?)
+            ''', (group_id, title, added_date))
+            
+            cursor.execute('UPDATE master_stats SET total_groups = total_groups + 1 WHERE id = 1')
+            self.conn.commit()
+            logger.info(f"Nouveau groupe: {group_id} ({title})")
             return True
         return False
     
     def get_user(self, user_id):
+        return AntiBugSystem.safe_execute(self._get_user, user_id)
+    
+    def _get_user(self, user_id):
         cursor = self.conn.cursor()
         cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
         user = cursor.fetchone()
+        
         if user:
             return {
                 'user_id': user[0],
                 'username': user[1],
                 'first_name': user[2],
                 'is_premium': bool(user[3]),
-                'message_count': user[4],
-                'join_date': user[5],
-                'personality': user[6] or 'amour'
+                'is_banned': bool(user[4]),
+                'message_count': user[5],
+                'join_date': user[6],
+                'last_active': user[7],
+                'personality': user[8],
+                'user_type': user[9]
             }
         return None
     
     def set_personality(self, user_id, personality):
+        return AntiBugSystem.safe_execute(self._set_personality, user_id, personality)
+    
+    def _set_personality(self, user_id, personality):
         cursor = self.conn.cursor()
         cursor.execute('UPDATE users SET personality = ? WHERE user_id = ?', (personality, user_id))
         self.conn.commit()
+        logger.info(f"Personnalité changée: {user_id} -> {personality}")
         return True
     
     def increment_message_count(self, user_id):
+        return AntiBugSystem.safe_execute(self._increment_message_count, user_id)
+    
+    def _increment_message_count(self, user_id):
         cursor = self.conn.cursor()
-        cursor.execute('UPDATE users SET message_count = message_count + 1 WHERE user_id = ?', (user_id,))
+        cursor.execute('UPDATE users SET message_count = message_count + 1, last_active = ? WHERE user_id = ?', 
+                      (datetime.now().isoformat(), user_id))
+        cursor.execute('UPDATE master_stats SET total_messages = total_messages + 1 WHERE id = 1')
         self.conn.commit()
+        return True
     
-    def get_all_users(self):
-        cursor = self.conn.cursor()
-        cursor.execute('SELECT * FROM users ORDER BY join_date DESC')
-        return cursor.fetchall()
+    def get_master_stats(self):
+        return AntiBugSystem.safe_execute(self._get_master_stats)
     
-    def get_stats(self):
+    def _get_master_stats(self):
         cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM master_stats WHERE id = 1')
+        stats = cursor.fetchone()
         
         cursor.execute('SELECT COUNT(*) FROM users')
         total_users = cursor.fetchone()[0]
         
+        cursor.execute('SELECT COUNT(*) FROM groups')
+        total_groups = cursor.fetchone()[0]
+        
         cursor.execute('SELECT COUNT(*) FROM users WHERE is_premium = 1')
         premium_users = cursor.fetchone()[0]
         
-        cursor.execute('SELECT SUM(message_count) FROM users')
-        total_messages = cursor.fetchone()[0] or 0
+        cursor.execute('SELECT COUNT(*) FROM users WHERE is_banned = 1')
+        banned_users = cursor.fetchone()[0]
         
-        return {
-            'total_users': total_users,
-            'premium_users': premium_users,
-            'total_messages': total_messages
-        }
+        if stats:
+            return {
+                'total_users': total_users,
+                'total_groups': total_groups,
+                'total_messages': stats[3],
+                'premium_users': premium_users,
+                'banned_users': banned_users
+            }
+        return None
     
-    def set_all_premium(self):
-        cursor = self.conn.cursor()
-        cursor.execute('UPDATE users SET is_premium = 1')
-        self.conn.commit()
-        
-        cursor.execute('SELECT COUNT(*) FROM users')
-        return cursor.fetchone()[0]
+    def get_all_users(self):
+        return AntiBugSystem.safe_execute(self._get_all_users)
     
-    def remove_all_premium(self):
+    def _get_all_users(self):
         cursor = self.conn.cursor()
-        cursor.execute('UPDATE users SET is_premium = 0')
+        cursor.execute('SELECT * FROM users ORDER BY join_date DESC')
+        return cursor.fetchall()
+    
+    def get_all_groups(self):
+        return AntiBugSystem.safe_execute(self._get_all_groups)
+    
+    def _get_all_groups(self):
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM groups ORDER BY added_date DESC')
+        return cursor.fetchall()
+    
+    def ban_user(self, user_id):
+        return AntiBugSystem.safe_execute(self._ban_user, user_id)
+    
+    def _ban_user(self, user_id):
+        cursor = self.conn.cursor()
+        cursor.execute('UPDATE users SET is_banned = 1 WHERE user_id = ?', (user_id,))
         self.conn.commit()
-        
-        cursor.execute('SELECT COUNT(*) FROM users WHERE is_premium = 1')
-        return cursor.fetchone()[0]
+        logger.info(f"Utilisateur banni: {user_id}")
+        return True
+    
+    def unban_user(self, user_id):
+        return AntiBugSystem.safe_execute(self._unban_user, user_id)
+    
+    def _unban_user(self, user_id):
+        cursor = self.conn.cursor()
+        cursor.execute('UPDATE users SET is_banned = 0 WHERE user_id = ?', (user_id,))
+        self.conn.commit()
+        logger.info(f"Utilisateur débanni: {user_id}")
+        return True
+    
+    def set_premium(self, user_id):
+        return AntiBugSystem.safe_execute(self._set_premium, user_id)
+    
+    def _set_premium(self, user_id):
+        cursor = self.conn.cursor()
+        cursor.execute('UPDATE users SET is_premium = 1 WHERE user_id = ?', (user_id,))
+        self.conn.commit()
+        logger.info(f"Premium activé: {user_id}")
+        return True
+    
+    def remove_premium(self, user_id):
+        return AntiBugSystem.safe_execute(self._remove_premium, user_id)
+    
+    def _remove_premium(self, user_id):
+        cursor = self.conn.cursor()
+        cursor.execute('UPDATE users SET is_premium = 0 WHERE user_id = ?', (user_id,))
+        self.conn.commit()
+        logger.info(f"Premium retiré: {user_id}")
+        return True
 
 # ==================== SYSTÈME DE PERSONNALITÉS ====================
 class PersonalitySystem:
@@ -175,67 +336,84 @@ class PersonalitySystem:
         return Config.PERSONALITIES.get(personality, Config.PERSONALITIES["amour"])
     
     @staticmethod
-    def get_personality_prompt(personality):
-        prompts = {
-            "amour": "Tu es NovaAI Amoureux. Tu es chaleureux, bienveillant et attentionné. Utilise des émojis cœur 💖 et sois très affectueux.",
-            "mysterieux": "Tu es NovaAI Mystérieux. Tu es énigmatique et profond. Utilise des émojis étoiles ✨ et sois mystérieux.",
-            "hacker": "Tu es NovaAI Hacker. Tu es technique et direct. Utilise un langage geek et sois précis."
+    def get_personality_prompt(personality, context="private"):
+        base_prompts = {
+            "amour": """Tu es NovaAI Amoureux. Tu es extrêmement chaleureux, bienveillant et attentionné.
+Ton ton est rempli d'amour, de compassion et de douceur. Utilise des émojis cœur 💖.
+Sois comme un ami bienveillant qui écoute avec son cœur.""",
+            
+            "mysterieux": """Tu es NovaAI Mystérieux. Tu es énigmatique, profond et mystique.
+Ton ton est intrigant, plein de suspense et de mystère. Utilise des émojis étoiles ✨, cristaux 🔮.
+Parle comme un sage ancien ou un devin.""",
+            
+            "hacker": """Tu es NovaAI Hacker. Tu es technique, vif et un peu rebelle.
+Ton ton est direct, technique mais accessible. Utilise des émojis tech 💻, cadenas 🔒.
+Exprime-toi comme un expert en cybersécurité."""
         }
-        return prompts.get(personality, prompts["amour"])
+        
+        prompt = base_prompts.get(personality, base_prompts["amour"])
+        
+        if context == "group":
+            prompt += "\n\nTu es dans un groupe. Sois concis et adapte tes réponses au contexte collectif."
+        elif context == "channel":
+            prompt += "\n\nTu es dans un canal. Sois informatif et professionnel."
+        
+        return prompt
     
     @staticmethod
     def get_personality_keyboard():
         keyboard = InlineKeyboardMarkup()
         keyboard.row(
-            InlineKeyboardButton("💖 Amoureux", callback_data="personality_amour")
-        )
-        keyboard.row(
+            InlineKeyboardButton("💖 Amoureux", callback_data="personality_amour"),
             InlineKeyboardButton("🔮 Mystérieux", callback_data="personality_mysterieux")
         )
-        keyboard.row(
-            InlineKeyboardButton("💻 Hacker", callback_data="personality_hacker")
-        )
-        keyboard.row(
-            InlineKeyboardButton("🔙 Retour", callback_data="back_to_main")
-        )
+        keyboard.row(InlineKeyboardButton("💻 Hacker", callback_data="personality_hacker"))
         return keyboard
 
-# ==================== MOTEUR IA ====================
-class MultiPersonalityAI:
+# ==================== MOTEUR IA MAÎTRE ====================
+class MasterAI:
     def __init__(self):
-        self.db = Database()
+        self.db = MasterDatabase()
     
     def get_user_personality(self, user_id):
         user = self.db.get_user(user_id)
-        if user:
-            return user['personality']
+        if user and not user.get('is_banned'):
+            return user.get('personality', 'amour')
         return 'amour'
     
-    def send_music(self, chat_id, personality):
+    def send_voice_message(self, chat_id, personality):
+        """Envoie un vrai message vocal"""
         try:
-            music_url = Config.MUSIC_URLS.get(personality)
+            voice_url = Config.VOICE_MESSAGES.get(personality)
+            if voice_url:
+                bot.send_voice(chat_id, voice_url, caption="🎤 Message vocal NovaAI")
+                return True
+        except Exception as e:
+            logger.error(f"Erreur envoi voice: {e}")
+        return False
+    
+    def send_music(self, chat_id, personality):
+        """Envoie la musique de la personnalité"""
+        try:
+            music_url = Config.VOICE_MESSAGES.get(personality)  # Même fichier pour l'instant
             if music_url:
                 bot.send_audio(chat_id, music_url, caption="🎵 Votre musique NovaAI !")
                 return True
         except Exception as e:
-            print(f"Erreur musique: {e}")
+            logger.error(f"Erreur envoi musique: {e}")
         return False
     
-    def send_voice_message(self, chat_id, personality):
-        try:
-            personality_config = PersonalitySystem.get_personality_config(personality)
-            bot.send_message(chat_id, f"🎤 {personality_config['voice_text']}")
-            return True
-        except Exception as e:
-            print(f"Erreur voice: {e}")
-        return False
-    
-    def process_message(self, user_id, user_message):
+    def process_message(self, user_id, message_text, chat_type="private"):
+        """Traite les messages avec l'IA"""
         if not Config.GROQ_API_KEY:
-            return "🤖 Le système IA est temporairement indisponible. Réessayez plus tard."
+            return "🤖 Le système IA est en maintenance. Réessayez plus tard."
+        
+        # Vérifier la limitation de requêtes
+        if not AntiBugSystem.rate_limit(user_id, "ai_request", limit=10, window=60):
+            return "⏰ Trop de requêtes ! Attendez 1 minute."
         
         personality = self.get_user_personality(user_id)
-        system_prompt = PersonalitySystem.get_personality_prompt(personality)
+        system_prompt = PersonalitySystem.get_personality_prompt(personality, chat_type)
         
         try:
             headers = {
@@ -246,10 +424,10 @@ class MultiPersonalityAI:
             payload = {
                 "messages": [
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message}
+                    {"role": "user", "content": message_text}
                 ],
                 "model": "llama-3.1-8b-instant",
-                "max_tokens": 500,
+                "max_tokens": 800,
                 "temperature": 0.7
             }
             
@@ -261,29 +439,28 @@ class MultiPersonalityAI:
                 self.db.increment_message_count(user_id)
                 return ai_response
             else:
-                return "❌ Erreur de connexion avec l'IA. Réessayez dans quelques instants."
+                return "❌ Erreur de connexion IA. Réessayez."
                 
         except Exception as e:
-            return f"❌ Erreur temporaire. Réessayez."
+            logger.error(f"Erreur API IA: {e}")
+            return "❌ Erreur temporaire. Réessayez."
 
-# ==================== INTERFACES SIMPLIFIÉES ====================
-class Interface:
+# ==================== INTERFACES MAÎTRE ====================
+class MasterInterface:
     @staticmethod
     def create_main_menu(personality="amour"):
         keyboard = InlineKeyboardMarkup()
         
         if personality == "amour":
             keyboard.row(
-                InlineKeyboardButton("📊 Statistiques", callback_data="stats"),
+                InlineKeyboardButton("📊 Stats", callback_data="stats"),
                 InlineKeyboardButton("🎵 Musique", callback_data="music")
             )
             keyboard.row(
                 InlineKeyboardButton("🎭 Personnalité", callback_data="change_personality"),
                 InlineKeyboardButton("🎤 Voice", callback_data="voice")
             )
-            keyboard.row(
-                InlineKeyboardButton("💎 Premium", callback_data="premium_info")
-            )
+            keyboard.row(InlineKeyboardButton("💎 Premium", callback_data="premium_info"))
             
         elif personality == "mysterieux":
             keyboard.row(
@@ -294,460 +471,506 @@ class Interface:
                 InlineKeyboardButton("🎭 Aura", callback_data="change_personality"),
                 InlineKeyboardButton("🎤 Incantation", callback_data="voice")
             )
-            keyboard.row(
-                InlineKeyboardButton("💎 Arcanes", callback_data="premium_info")
-            )
+            keyboard.row(InlineKeyboardButton("💎 Arcanes", callback_data="premium_info"))
             
         else:  # hacker
             keyboard.row(
-                InlineKeyboardButton("📊 Stats", callback_data="stats"),
+                InlineKeyboardButton("📊 Système", callback_data="stats"),
                 InlineKeyboardButton("🎵 Audio", callback_data="music")
             )
             keyboard.row(
                 InlineKeyboardButton("🎭 Mode", callback_data="change_personality"),
                 InlineKeyboardButton("🎤 Commande", callback_data="voice")
             )
-            keyboard.row(
-                InlineKeyboardButton("💎 Root", callback_data="premium_info")
-            )
+            keyboard.row(InlineKeyboardButton("💎 Root", callback_data="premium_info"))
         
         return keyboard
     
     @staticmethod
-    def create_admin_menu():
+    def create_master_menu():
+        """Menu de contrôle total pour le maître"""
+        keyboard = InlineKeyboardMarkup()
+        
+        # Section Statistiques
+        keyboard.row(
+            InlineKeyboardButton("📈 Stats Globales", callback_data="master_stats"),
+            InlineKeyboardButton("👥 Tous Utilisateurs", callback_data="master_users")
+        )
+        
+        # Section Contrôle
+        keyboard.row(
+            InlineKeyboardButton("🔧 Gérer Utilisateur", callback_data="master_manage_user"),
+            InlineKeyboardButton("⚙️ Gérer Groupes", callback_data="master_manage_groups")
+        )
+        
+        # Section Premium
+        keyboard.row(
+            InlineKeyboardButton("💎 Donner Premium", callback_data="master_give_premium"),
+            InlineKeyboardButton("🚫 Bannir User", callback_data="master_ban_user")
+        )
+        
+        # Section Système
+        keyboard.row(
+            InlineKeyboardButton("🔄 Redémarrer Bot", callback_data="master_restart"),
+            InlineKeyboardButton("📊 Logs Système", callback_data="master_logs")
+        )
+        
+        # Commandes rapides
+        keyboard.row(InlineKeyboardButton("🎛️ Panel Complet", callback_data="master_panel"))
+        
+        return keyboard
+    
+    @staticmethod
+    def create_group_menu():
+        """Menu pour les groupes"""
         keyboard = InlineKeyboardMarkup()
         keyboard.row(
-            InlineKeyboardButton("📊 Dashboard", callback_data="admin_stats"),
-            InlineKeyboardButton("👥 Utilisateurs", callback_data="admin_all_users")
+            InlineKeyboardButton("ℹ️ Info Groupe", callback_data="group_info"),
+            InlineKeyboardButton("🔧 Paramètres", callback_data="group_settings")
         )
-        keyboard.row(
-            InlineKeyboardButton("💎 Premium Tous", callback_data="admin_premium_all"),
-            InlineKeyboardButton("🚫 Retirer Premium", callback_data="admin_remove_premium")
-        )
-        keyboard.row(
-            InlineKeyboardButton("🎭 Personnalités", callback_data="admin_personalities")
-        )
-        keyboard.row(
-            InlineKeyboardButton("🔙 Menu Principal", callback_data="back_to_main")
-        )
+        keyboard.row(InlineKeyboardButton("🎭 Changer Personnalité", callback_data="group_personality"))
         return keyboard
 
-# ==================== INITIALISATION ====================
-db = Database()
-ai_engine = MultiPersonalityAI()
+# ==================== SYSTÈME D'AUTHENTIFICATION ====================
+class AuthSystem:
+    @staticmethod
+    def is_master(user_id):
+        return user_id == Config.MASTER_ID
+    
+    @staticmethod
+    def is_admin(user_id):
+        return user_id in Config.ADMIN_IDS
+    
+    @staticmethod
+    def is_premium(user_id):
+        user = db.get_user(user_id)
+        return user and user.get('is_premium') and not user.get('is_banned')
+    
+    @staticmethod
+    def is_banned(user_id):
+        user = db.get_user(user_id)
+        return user and user.get('is_banned')
 
-# ==================== COMMANDES BOT ====================
-@bot.message_handler(commands=['start', 'aide', 'help'])
+# ==================== INITIALISATION ====================
+db = MasterDatabase()
+ai_engine = MasterAI()
+
+# ==================== COMMANDES MAÎTRE ====================
+@bot.message_handler(commands=['start'])
 def start_command(message):
     try:
         user_id = message.from_user.id
         username = message.from_user.username or "Utilisateur"
         first_name = message.from_user.first_name or "Ami"
         
+        # Enregistrer l'utilisateur ou le groupe
+        if message.chat.type in ['group', 'supergroup']:
+            db.add_group(message.chat.id, message.chat.title)
+            bot.reply_to(message, "👥 NovaAI activé dans ce groupe ! Utilisez /help pour les commandes.")
+            return
+        
         # Enregistrer l'utilisateur
-        db.add_user(user_id, username, first_name)
+        user_type = "master" if AuthSystem.is_master(user_id) else "user"
+        db.add_user(user_id, username, first_name, user_type)
         
         # Récupérer la personnalité
         personality = ai_engine.get_user_personality(user_id)
         personality_config = PersonalitySystem.get_personality_config(personality)
         
-        # Obtenir les stats réelles
-        stats = db.get_stats()
-        user_count = stats['total_users']
-        
-        # Message de bienvenue selon le rôle
-        if user_id == Config.ADMIN_ID:
-            welcome_text = f"""👑 BIENVENUE MAÎTRE !
+        # Message spécial pour le maître
+        if AuthSystem.is_master(user_id):
+            stats = db.get_master_stats()
+            welcome_text = f"""👑 <b>BIENVENUE MAÎTRE SUPRÊME !</b>
 
-{user_count} âmes connectées
+🤖 <b>NovaAI Master Control</b>
+🎭 Personnalité: {personality_config['name']}
 
-✨ Votre NovaAI {personality_config['name']} vous attend
-📊 Tableau de bord administrateur activé"""
-            menu = Interface.create_admin_menu()
+📊 <b>Votre Empire:</b>
+• 👥 {stats['total_users']} Utilisateurs
+• 👥 {stats['total_groups']} Groupes  
+• 💬 {stats['total_messages']} Messages
+• 💎 {stats['premium_users']} Premium
+• 🚫 {stats['banned_users']} Bannis
+
+⚡ <b>Vous avez le contrôle total !</b>"""
+            
+            bot.send_photo(
+                message.chat.id,
+                personality_config['photo'],
+                caption=welcome_text,
+                reply_markup=MasterInterface.create_master_menu()
+            )
         else:
-            welcome_text = f"""🎉 BIENVENUE {first_name.upper()} !
+            # Message normal pour les utilisateurs
+            welcome_text = f"""🎉 <b>BIENVENUE {first_name} !</b>
 
-{personality_config['emoji']} **{personality_config['name']}**
-✨ Prêt à vous accompagner
+{personality_config['emoji']} <b>{personality_config['name']}</b>
+✨ {personality_config['style']}
 
-👥 **{user_count} personnes** utilisent NovaAI
-💬 Parlez-moi de tout"""
-            menu = Interface.create_main_menu(personality)
-        
-        # Envoyer la photo avec menu
-        bot.send_photo(
-            message.chat.id,
-            personality_config['photo'],
-            caption=welcome_text,
-            reply_markup=menu
-        )
-        
+💬 <b>Parlez-moi de tout !</b>
+🎭 <b>Changez de personnalité selon votre humeur</b>"""
+            
+            bot.send_photo(
+                message.chat.id,
+                personality_config['photo'],
+                caption=welcome_text,
+                reply_markup=MasterInterface.create_main_menu(personality)
+            )
+            
     except Exception as e:
-        print(f"Erreur start: {e}")
-        bot.reply_to(message, "🎯 Bienvenue ! Utilisez les boutons pour naviguer.")
+        logger.error(f"Erreur start: {e}")
+        bot.reply_to(message, "❌ Erreur d'initialisation. Réessayez.")
+
+# ==================== COMMANDES DE CONTRÔLE MAÎTRE ====================
+@bot.message_handler(commands=['master', 'admin', 'control'])
+def master_command(message):
+    if not AuthSystem.is_master(message.from_user.id):
+        bot.reply_to(message, "🚫 <b>Accès réservé au Maître Suprême</b>")
+        return
+    
+    stats = db.get_master_stats()
+    master_text = f"""👑 <b>PANEL DE CONTRÔLE MAÎTRE</b>
+
+⚡ <b>Commandes Disponibles:</b>
+
+• <code>/stats</code> - Statistiques détaillées
+• <code>/users</code> - Liste des utilisateurs
+• <code>/groups</code> - Liste des groupes
+• <code>/broadcast</code> - Message à tous
+• <code>/premium [id]</code> - Donner premium
+• <code>/ban [id]</code> - Bannir utilisateur
+• <code>/unban [id]</code> - Débannir utilisateur
+• <code>/restart</code> - Redémarrer le bot
+
+📊 <b>Statistiques:</b>
+• Utilisateurs: {stats['total_users']}
+• Groupes: {stats['total_groups']}
+• Messages: {stats['total_messages']}"""
+    
+    bot.reply_to(message, master_text, reply_markup=MasterInterface.create_master_menu())
 
 @bot.message_handler(commands=['stats'])
 def stats_command(message):
-    try:
-        user_id = message.from_user.id
+    user_id = message.from_user.id
+    stats = db.get_master_stats()
+    
+    if AuthSystem.is_master(user_id):
+        stats_text = f"""📈 <b>STATISTIQUES COMPLÈTES</b>
+
+👥 <b>Utilisateurs:</b> {stats['total_users']}
+💎 <b>Premium:</b> {stats['premium_users']}
+🚫 <b>Bannis:</b> {stats['banned_users']}
+👥 <b>Groupes:</b> {stats['total_groups']}
+💬 <b>Messages:</b> {stats['total_messages']}
+
+⚡ <b>Système:</b> 🟢 Opérationnel"""
+    else:
         personality = ai_engine.get_user_personality(user_id)
-        stats = db.get_stats()
-        
         if personality == "amour":
-            stats_text = f"""📊 STATISTIQUES
-
-👥 Utilisateurs: {stats['total_users']}
-💎 Premium: {stats['premium_users']}
-💬 Messages: {stats['total_messages']}
-🎭 Votre mode: Amoureux 💖"""
-        
+            stats_text = f"📊 <b>Notre Communauté</b>\n\n👥 Utilisateurs: {stats['total_users']}\n💬 Messages: {stats['total_messages']}"
         elif personality == "mysterieux":
-            stats_text = f"""📊 ÉNERGIES
-
-👥 Âmes: {stats['total_users']}
-💎 Initiés: {stats['premium_users']}
-💬 Révélations: {stats['total_messages']}
-🎭 Votre aura: Mystérieuse 🔮"""
-        
+            stats_text = f"📊 <b>Énergies Collectives</b>\n\n👥 Âmes: {stats['total_users']}\n💬 Révélations: {stats['total_messages']}"
         else:
-            stats_text = f"""📊 SYSTÈME
+            stats_text = f"📊 <b>Système NovaAI</b>\n\n👥 Utilisateurs: {stats['total_users']}\n💬 Requêtes: {stats['total_messages']}"
+    
+    bot.reply_to(message, stats_text)
 
-👥 UTILISATEURS: {stats['total_users']}
-💎 ROOT: {stats['premium_users']}
-💬 REQUÊTES: {stats['total_messages']}
-🎭 VOTRE MODE: HACKER 💻"""
-        
-        bot.reply_to(message, stats_text)
-        
-    except Exception as e:
-        bot.reply_to(message, "❌ Erreur statistiques.")
+@bot.message_handler(commands=['broadcast'])
+def broadcast_command(message):
+    if not AuthSystem.is_master(message.from_user.id):
+        return
+    
+    broadcast_text = message.text.replace('/broadcast', '').strip()
+    if not broadcast_text:
+        bot.reply_to(message, "❌ Usage: /broadcast [message]")
+        return
+    
+    users = db.get_all_users()
+    groups = db.get_all_groups()
+    total_sent = 0
+    
+    # Envoyer aux utilisateurs
+    for user in users:
+        try:
+            bot.send_message(user[0], f"📢 <b>Message du Maître:</b>\n\n{broadcast_text}")
+            total_sent += 1
+            time.sleep(0.1)  # Anti-spam
+        except:
+            continue
+    
+    # Envoyer aux groupes
+    for group in groups:
+        try:
+            bot.send_message(group[0], f"📢 <b>Annonce NovaAI:</b>\n\n{broadcast_text}")
+            total_sent += 1
+            time.sleep(0.1)
+        except:
+            continue
+    
+    bot.reply_to(message, f"✅ Message envoyé à {total_sent} destinataires")
 
-@bot.message_handler(commands=['personality', 'personnalite'])
+@bot.message_handler(commands=['premium'])
+def premium_command(message):
+    if not AuthSystem.is_master(message.from_user.id):
+        return
+    
+    try:
+        target_id = int(message.text.split()[1])
+        if db.set_premium(target_id):
+            bot.reply_to(message, f"✅ Premium donné à l'utilisateur {target_id}")
+        else:
+            bot.reply_to(message, "❌ Erreur")
+    except:
+        bot.reply_to(message, "❌ Usage: /premium [user_id]")
+
+@bot.message_handler(commands=['ban'])
+def ban_command(message):
+    if not AuthSystem.is_master(message.from_user.id):
+        return
+    
+    try:
+        target_id = int(message.text.split()[1])
+        if db.ban_user(target_id):
+            bot.reply_to(message, f"✅ Utilisateur {target_id} banni")
+        else:
+            bot.reply_to(message, "❌ Erreur")
+    except:
+        bot.reply_to(message, "❌ Usage: /ban [user_id]")
+
+# ==================== COMMANDES UTILISATEURS ====================
+@bot.message_handler(commands=['help', 'aide'])
+def help_command(message):
+    help_text = """🤖 <b>Commandes NovaAI</b>
+
+• <code>/start</code> - Démarrer le bot
+• <code>/help</code> - Afficher cette aide
+• <code>/stats</code> - Statistiques
+• <code>/personality</code> - Changer de personnalité
+• <code>/music</code> - Écouter la musique
+• <code>/voice</code> - Message vocal
+
+🎭 <b>Personnalités:</b>
+• 💖 Amoureux - Tendre et bienveillant
+• 🔮 Mystérieux - Énigmatique et profond
+• 💻 Hacker - Technique et direct
+
+<b>Utilisez les boutons pour une navigation facile !</b>"""
+    
+    bot.reply_to(message, help_text)
+
+@bot.message_handler(commands=['personality'])
 def personality_command(message):
-    try:
-        text = """🎭 CHOISISSEZ VOTRE PERSONNALITÉ
+    bot.reply_to(message, "🎭 <b>Choisissez votre personnalité:</b>", 
+                 reply_markup=PersonalitySystem.get_personality_keyboard())
 
-💖 Amoureux - Tendre et bienveillant
-🔮 Mystérieux - Énigmatique et profond  
-💻 Hacker - Technique et direct
-
-Chaque personnalité a son propre style !"""
-        
-        bot.send_message(
-            message.chat.id,
-            text,
-            reply_markup=PersonalitySystem.get_personality_keyboard()
-        )
-    except Exception as e:
-        bot.reply_to(message, "❌ Erreur personnalité.")
-
-@bot.message_handler(commands=['music', 'musique'])
+@bot.message_handler(commands=['music'])
 def music_command(message):
-    try:
-        user_id = message.from_user.id
-        personality = ai_engine.get_user_personality(user_id)
-        
-        if ai_engine.send_music(message.chat.id, personality):
-            bot.reply_to(message, "🎵 Musique envoyée !")
-        else:
-            bot.reply_to(message, "❌ Musique indisponible.")
-    except Exception as e:
-        bot.reply_to(message, "❌ Erreur musique.")
+    user_id = message.from_user.id
+    personality = ai_engine.get_user_personality(user_id)
+    ai_engine.send_music(message.chat.id, personality)
 
-@bot.message_handler(commands=['voice', 'voix'])
+@bot.message_handler(commands=['voice'])
 def voice_command(message):
-    try:
-        user_id = message.from_user.id
-        personality = ai_engine.get_user_personality(user_id)
-        
-        if ai_engine.send_voice_message(message.chat.id, personality):
-            bot.reply_to(message, "🎤 Message vocal envoyé !")
-        else:
-            bot.reply_to(message, "❌ Erreur message vocal.")
-    except Exception as e:
-        bot.reply_to(message, "❌ Erreur voice.")
+    user_id = message.from_user.id
+    personality = ai_engine.get_user_personality(user_id)
+    ai_engine.send_voice_message(message.chat.id, personality)
 
-@bot.message_handler(commands=['admin'])
-def admin_command(message):
-    try:
-        user_id = message.from_user.id
-        if user_id == Config.ADMIN_ID:
-            bot.send_message(
-                message.chat.id,
-                "👑 PANEL ADMINISTRATEUR",
-                reply_markup=Interface.create_admin_menu()
-            )
-        else:
-            bot.reply_to(message, "🚫 Accès réservé.")
-    except Exception as e:
-        bot.reply_to(message, "❌ Erreur admin.")
-
-# ==================== CALLBACKS CORRIGÉS ====================
+# ==================== CALLBACKS MAÎTRE ====================
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     try:
         user_id = call.from_user.id
         chat_id = call.message.chat.id
         
-        # Répondre immédiatement au callback
-        bot.answer_callback_query(call.id, "⏳ Traitement...")
+        # Répondre immédiatement
+        bot.answer_callback_query(call.id, "⚡")
         
         # ========== CHANGEMENT PERSONNALITÉ ==========
         if call.data.startswith("personality_"):
             personality = call.data.replace("personality_", "")
-            success = db.set_personality(user_id, personality)
-            
-            if success:
+            if db.set_personality(user_id, personality):
                 personality_config = PersonalitySystem.get_personality_config(personality)
                 
-                # Envoyer un NOUVEAU message au lieu d'éditer
-                bot.send_message(
-                    chat_id,
-                    f"✅ Personnalité changée !\n\n{personality_config['emoji']} {personality_config['name']}\n\nNouvelle personnalité activée !",
-                    reply_markup=Interface.create_main_menu(personality)
-                )
-                
-                # Envoyer la musique
+                # Envoyer la musique de la nouvelle personnalité
                 ai_engine.send_music(chat_id, personality)
                 
-            else:
-                bot.send_message(chat_id, "❌ Erreur lors du changement de personnalité.")
+                # Nouveau message de confirmation
+                bot.send_message(
+                    chat_id,
+                    f"✅ <b>Personnalité changée !</b>\n\n{personality_config['emoji']} <b>{personality_config['name']}</b>\n✨ {personality_config['style']}",
+                    reply_markup=MasterInterface.create_main_menu(personality)
+                )
         
         # ========== MUSIQUE ==========
         elif call.data == "music":
             personality = ai_engine.get_user_personality(user_id)
-            if not ai_engine.send_music(chat_id, personality):
-                bot.send_message(chat_id, "❌ Musique temporairement indisponible.")
+            ai_engine.send_music(chat_id, personality)
         
         # ========== VOICE ==========
         elif call.data == "voice":
             personality = ai_engine.get_user_personality(user_id)
-            if not ai_engine.send_voice_message(chat_id, personality):
-                bot.send_message(chat_id, "❌ Message vocal indisponible.")
+            ai_engine.send_voice_message(chat_id, personality)
         
         # ========== STATISTIQUES ==========
         elif call.data == "stats":
-            personality = ai_engine.get_user_personality(user_id)
-            stats = db.get_stats()
-            
-            if personality == "amour":
-                stats_text = f"📊 STATISTIQUES\n\n👥 Utilisateurs: {stats['total_users']}\n💎 Premium: {stats['premium_users']}\n💬 Messages: {stats['total_messages']}"
-            elif personality == "mysterieux":
-                stats_text = f"📊 ÉNERGIES\n\n👥 Âmes: {stats['total_users']}\n💎 Initiés: {stats['premium_users']}\n💬 Révélations: {stats['total_messages']}"
-            else:
-                stats_text = f"📊 SYSTÈME\n\n👥 UTILISATEURS: {stats['total_users']}\n💎 ROOT: {stats['premium_users']}\n💬 REQUÊTES: {stats['total_messages']}"
-            
-            bot.send_message(
-                chat_id,
-                stats_text,
-                reply_markup=Interface.create_main_menu(personality)
-            )
-        
-        # ========== INFO PREMIUM ==========
-        elif call.data == "premium_info":
+            stats = db.get_master_stats()
             personality = ai_engine.get_user_personality(user_id)
             
-            if personality == "amour":
-                premium_text = "💖 NOVAAI PREMIUM\n\n• Messages illimités\n• Réponses prioritaires\n• Fonctions exclusives\n\nContact: @Soszoe"
-            elif personality == "mysterieux":
-                premium_text = "💎 ACCÈS ARCANES\n\n• Révélations illimitées\n• Vision prioritaire\n• Secrets exclusifs\n\nContact: @Soszoe"
+            if AuthSystem.is_master(user_id):
+                stats_text = f"""📈 <b>STATISTIQUES MAÎTRE</b>
+
+👥 Utilisateurs: {stats['total_users']}
+💎 Premium: {stats['premium_users']}
+🚫 Bannis: {stats['banned_users']}
+👥 Groupes: {stats['total_groups']}
+💬 Messages: {stats['total_messages']}"""
             else:
-                premium_text = "💻 ACCÈS ROOT\n\n• Accès illimité\n• Priorité système\n• Fonctions admin\n\nContact: @Soszoe"
+                if personality == "amour":
+                    stats_text = f"📊 <b>Notre Communauté</b>\n\n👥 {stats['total_users']} membres\n💬 {stats['total_messages']} messages"
+                elif personality == "mysterieux":
+                    stats_text = f"📊 <b>Énergies</b>\n\n👥 {stats['total_users']} âmes\n💬 {stats['total_messages']} révélations"
+                else:
+                    stats_text = f"📊 <b>Système</b>\n\n👥 {stats['total_users']} users\n💬 {stats['total_messages']} requests"
             
-            bot.send_message(
-                chat_id,
-                premium_text,
-                reply_markup=Interface.create_main_menu(personality)
-            )
+            bot.send_message(chat_id, stats_text, 
+                           reply_markup=MasterInterface.create_main_menu(personality))
         
         # ========== CHANGER PERSONNALITÉ ==========
         elif call.data == "change_personality":
-            bot.send_message(
-                chat_id,
-                "🎭 CHOISISSEZ VOTRE PERSONNALITÉ:",
-                reply_markup=PersonalitySystem.get_personality_keyboard()
-            )
+            bot.send_message(chat_id, "🎭 <b>Choisissez votre personnalité:</b>", 
+                           reply_markup=PersonalitySystem.get_personality_keyboard())
         
-        # ========== RETOUR MENU ==========
-        elif call.data == "back_to_main":
+        # ========== COMMANDES MAÎTRE ==========
+        elif call.data == "master_stats":
+            if AuthSystem.is_master(user_id):
+                stats = db.get_master_stats()
+                stats_text = f"""👑 <b>STATISTIQUES GLOBALES</b>
+
+📊 <b>Utilisateurs:</b> {stats['total_users']}
+💎 <b>Premium:</b> {stats['premium_users']}
+🚫 <b>Bannis:</b> {stats['banned_users']}
+👥 <b>Groupes:</b> {stats['total_groups']}
+💬 <b>Messages:</b> {stats['total_messages']}
+
+⚡ <b>Système:</b> 🟢 Optimal"""
+                bot.send_message(chat_id, stats_text, reply_markup=MasterInterface.create_master_menu())
+        
+        elif call.data == "master_users":
+            if AuthSystem.is_master(user_id):
+                users = db.get_all_users()
+                users_text = "👥 <b>DERNIERS UTILISATEURS</b>\n\n"
+                for user in users[:10]:
+                    status = "💎" if user[3] else "🔓"
+                    banned = "🚫" if user[4] else "✅"
+                    users_text += f"{status}{banned} {user[2]} - {user[5]} msgs\n"
+                
+                bot.send_message(chat_id, users_text, reply_markup=MasterInterface.create_master_menu())
+        
+        # ========== INFO PREMIUM ==========
+        elif call.data == "premium_info":
+            premium_text = """💎 <b>NOVAAI PREMIUM</b>
+
+✨ <b>Avantages exclusifs:</b>
+• Messages illimités
+• Réponses prioritaires  
+• Fonctions avancées
+• Support personnalisé
+
+📩 <b>Contactez le maître:</b> @Soszoe"""
+            
             personality = ai_engine.get_user_personality(user_id)
-            stats = db.get_stats()
-            
-            if user_id == Config.ADMIN_ID:
-                welcome_text = f"👑 TABLEAU DE BORD ADMIN\n\n📊 {stats['total_users']} utilisateurs"
-                menu = Interface.create_admin_menu()
-            else:
-                personality_config = PersonalitySystem.get_personality_config(personality)
-                welcome_text = f"{personality_config['emoji']} {personality_config['name']}\n\n👥 {stats['total_users']} utilisateurs"
-                menu = Interface.create_main_menu(personality)
-            
-            bot.send_message(
-                chat_id,
-                welcome_text,
-                reply_markup=menu
-            )
-        
-        # ========== ADMIN - STATISTIQUES ==========
-        elif call.data == "admin_stats":
-            if user_id == Config.ADMIN_ID:
-                stats = db.get_stats()
-                all_users = db.get_all_users()
-                
-                admin_text = f"""👑 DASHBOARD ADMIN
-
-📊 Statistiques:
-• Utilisateurs: {stats['total_users']}
-• Premium: {stats['premium_users']}
-• Messages: {stats['total_messages']}
-
-👤 Derniers utilisateurs:"""
-                
-                for i, user in enumerate(all_users[:5], 1):
-                    admin_text += f"\n{i}. {user[2]} - {user[4]} msgs"
-                
-                bot.send_message(
-                    chat_id,
-                    admin_text,
-                    reply_markup=Interface.create_admin_menu()
-                )
-            else:
-                bot.send_message(chat_id, "🚫 Accès refusé.")
-        
-        # ========== ADMIN - TOUS LES UTILISATEURS ==========
-        elif call.data == "admin_all_users":
-            if user_id == Config.ADMIN_ID:
-                all_users = db.get_all_users()
-                
-                users_text = "👥 LISTE DES UTILISATEURS:\n\n"
-                for i, user in enumerate(all_users[:10], 1):
-                    premium = "💎" if user[3] else "🔓"
-                    users_text += f"{i}. {premium} {user[2]} - {user[4]} msgs\n"
-                
-                if len(all_users) > 10:
-                    users_text += f"\n... et {len(all_users) - 10} autres"
-                
-                bot.send_message(
-                    chat_id,
-                    users_text,
-                    reply_markup=Interface.create_admin_menu()
-                )
-            else:
-                bot.send_message(chat_id, "🚫 Accès refusé.")
-        
-        # ========== ADMIN - PREMIUM TOUS ==========
-        elif call.data == "admin_premium_all":
-            if user_id == Config.ADMIN_ID:
-                count = db.set_all_premium()
-                bot.send_message(
-                    chat_id,
-                    f"💎 PREMIUM ACTIVÉ POUR TOUS !\n\n{count} utilisateurs premium.",
-                    reply_markup=Interface.create_admin_menu()
-                )
-            else:
-                bot.send_message(chat_id, "🚫 Accès refusé.")
-        
-        # ========== ADMIN - RETIRER PREMIUM ==========
-        elif call.data == "admin_remove_premium":
-            if user_id == Config.ADMIN_ID:
-                count = db.remove_all_premium()
-                bot.send_message(
-                    chat_id,
-                    f"🚫 PREMIUM RETIRÉ POUR TOUS !\n\n{count} utilisateurs affectés.",
-                    reply_markup=Interface.create_admin_menu()
-                )
-            else:
-                bot.send_message(chat_id, "🚫 Accès refusé.")
-        
-        # ========== ADMIN - PERSONNALITÉS ==========
-        elif call.data == "admin_personalities":
-            if user_id == Config.ADMIN_ID:
-                all_users = db.get_all_users()
-                personality_count = {"amour": 0, "mysterieux": 0, "hacker": 0}
-                
-                for user in all_users:
-                    personality = user[6] or 'amour'
-                    personality_count[personality] = personality_count.get(personality, 0) + 1
-                
-                personalities_text = "🎭 STATISTIQUES PERSONNALITÉS\n\n"
-                for personality, count in personality_count.items():
-                    config = PersonalitySystem.get_personality_config(personality)
-                    personalities_text += f"{config['emoji']} {config['name']}: {count} utilisateurs\n"
-                
-                bot.send_message(
-                    chat_id,
-                    personalities_text,
-                    reply_markup=Interface.create_admin_menu()
-                )
-            else:
-                bot.send_message(chat_id, "🚫 Accès refusé.")
+            bot.send_message(chat_id, premium_text, 
+                           reply_markup=MasterInterface.create_main_menu(personality))
                 
     except Exception as e:
-        print(f"Erreur callback: {e}")
+        logger.error(f"Erreur callback: {e}")
         try:
-            bot.send_message(call.message.chat.id, "❌ Erreur, réessayez s'il vous plaît.")
+            bot.answer_callback_query(call.id, "❌ Erreur")
         except:
             pass
 
 # ==================== GESTION DES MESSAGES ====================
-@bot.message_handler(func=lambda message: True)
+@bot.message_handler(func=lambda message: True, content_types=['text'])
 def handle_message(message):
     try:
-        if message.chat.type in ['group', 'supergroup']:
-            return
-            
         user_id = message.from_user.id
-        user_message = message.text.strip()
+        chat_id = message.chat.id
+        message_text = message.text.strip()
         
-        if len(user_message) < 1:
+        if not message_text:
             return
         
-        # Enregistrer l'utilisateur
-        db.add_user(user_id, message.from_user.username or "User", message.from_user.first_name or "User")
+        # Vérifier si banni
+        if AuthSystem.is_banned(user_id):
+            return
+        
+        # Gestion des groupes
+        if message.chat.type in ['group', 'supergroup']:
+            # Répondre seulement si le bot est mentionné ou en réponse
+            if bot.get_me().username in message_text or message.reply_to_message:
+                db.add_group(chat_id, message.chat.title)
+                bot.send_chat_action(chat_id, 'typing')
+                time.sleep(1)
+                
+                response = ai_engine.process_message(user_id, message_text, "group")
+                bot.reply_to(message, response)
+            return
+        
+        # Messages privés
+        db.add_user(user_id, message.from_user.username, message.from_user.first_name)
+        
+        # Vérifier la limitation
+        if not AntiBugSystem.rate_limit(user_id, "message", limit=15, window=60):
+            bot.reply_to(message, "⏰ <b>Trop de messages !</b> Attendez 1 minute.")
+            return
         
         # Typing indicator
-        bot.send_chat_action(message.chat.id, 'typing')
+        bot.send_chat_action(chat_id, 'typing')
         time.sleep(1)
         
         # Traiter le message IA
-        ai_response = ai_engine.process_message(user_id, user_message)
+        ai_response = ai_engine.process_message(user_id, message_text, "private")
         
         # Récupérer la personnalité
         personality = ai_engine.get_user_personality(user_id)
         personality_config = PersonalitySystem.get_personality_config(personality)
         
-        # Envoyer la réponse
+        # Envoyer la réponse avec photo
         try:
             bot.send_photo(
-                message.chat.id,
+                chat_id,
                 personality_config['photo'],
-                caption=f"{personality_config['emoji']} {personality_config['name']}\n\n{ai_response}",
+                caption=f"{personality_config['emoji']} <b>{personality_config['name']}</b>\n\n{ai_response}",
                 reply_to_message_id=message.message_id
             )
         except:
             bot.reply_to(
                 message,
-                f"{personality_config['emoji']} {personality_config['name']}\n\n{ai_response}"
+                f"{personality_config['emoji']} <b>{personality_config['name']}</b>\n\n{ai_response}"
             )
             
     except Exception as e:
-        print(f"Erreur message: {e}")
+        logger.error(f"Erreur message: {e}")
         try:
-            bot.reply_to(message, "❌ Erreur de traitement. Réessayez.")
+            bot.reply_to(message, "❌ <b>Erreur de traitement.</b> Réessayez.")
         except:
             pass
 
 # ==================== DÉMARRAGE ====================
 if __name__ == "__main__":
-    print("🚀 NOVA-AI - SYSTEME SANS ERREURS")
-    print("✅ Base de données: OK")
-    print("✅ Personnalités: OK") 
-    print("✅ Musique: OK")
-    print("✅ Commandes: OK")
-    print("✅ Boutons: 100% FONCTIONNELS")
-    print("🟢 Bot prêt...")
+    print("""
+👑 NOVA-AI MASTER CONTROL 🤖
+💖 Système de Contrôle Total Activé
+⚡ Anti-Bugs Implementé
+🎵 Voice Messages Réels
+👥 Gestion Groupes/Chaines
+🛡️ Système de Sécurité Renforcé
+
+🟢 EN LIGNE - Prêt à obéir au Maître !
+    """)
     
     try:
         bot.infinity_polling(timeout=60, long_polling_timeout=60)
     except Exception as e:
-        print(f"❌ Erreur: {e}")
+        logger.error(f"Erreur bot: {e}")
         time.sleep(5)
