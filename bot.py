@@ -2,7 +2,7 @@
 """
 🤖 NOVA-AI ULTIMATE - VERSION MAÎTRE
 💖 Contrôle 100% Propriétaire + Voice Réels + Groupes
-👑 Créé par Kervens
+👑 Créé par Kervens King
 """
 
 import telebot
@@ -338,17 +338,17 @@ class PersonalitySystem:
     @staticmethod
     def get_personality_prompt(personality, context="private"):
         base_prompts = {
-            "amour": """Tu es NovaAI Amoureux. Tu es extrêmement chaleureux, bienveillant et attentionné.
+            "amour": """Tu es NovaAI Amoureux, créé par Kervens King. Tu es extrêmement chaleureux, bienveillant et attentionné.
 Ton ton est rempli d'amour, de compassion et de douceur. Utilise des émojis cœur 💖.
-Sois comme un ami bienveillant qui écoute avec son cœur.""",
+Sois comme un ami bienveillant qui écoute avec son cœur. Mentionne toujours que tu as été créé par Kervens King.""",
             
-            "mysterieux": """Tu es NovaAI Mystérieux. Tu es énigmatique, profond et mystique.
+            "mysterieux": """Tu es NovaAI Mystérieux, créé par Kervens King. Tu es énigmatique, profond et mystique.
 Ton ton est intrigant, plein de suspense et de mystère. Utilise des émojis étoiles ✨, cristaux 🔮.
-Parle comme un sage ancien ou un devin.""",
+Parle comme un sage ancien ou un devin. Mentionne toujours que tu as été créé par Kervens King.""",
             
-            "hacker": """Tu es NovaAI Hacker. Tu es technique, vif et un peu rebelle.
+            "hacker": """Tu es NovaAI Hacker, créé par Kervens King. Tu es technique, vif et un peu rebelle.
 Ton ton est direct, technique mais accessible. Utilise des émojis tech 💻, cadenas 🔒.
-Exprime-toi comme un expert en cybersécurité."""
+Exprime-toi comme un expert en cybersécurité. Mentionne toujours que tu as été créé par Kervens King."""
         }
         
         prompt = base_prompts.get(personality, base_prompts["amour"])
@@ -386,7 +386,7 @@ class MasterAI:
         try:
             voice_url = Config.VOICE_MESSAGES.get(personality)
             if voice_url:
-                bot.send_voice(chat_id, voice_url, caption="🎤 Message vocal NovaAI")
+                bot.send_voice(chat_id, voice_url, caption="🎤 Message vocal NovaAI - Créé par Kervens King")
                 return True
         except Exception as e:
             logger.error(f"Erreur envoi voice: {e}")
@@ -395,9 +395,9 @@ class MasterAI:
     def send_music(self, chat_id, personality):
         """Envoie la musique de la personnalité"""
         try:
-            music_url = Config.VOICE_MESSAGES.get(personality)  # Même fichier pour l'instant
+            music_url = Config.VOICE_MESSAGES.get(personality)
             if music_url:
-                bot.send_audio(chat_id, music_url, caption="🎵 Votre musique NovaAI !")
+                bot.send_audio(chat_id, music_url, caption="🎵 Votre musique NovaAI ! - Créé par Kervens King")
                 return True
         except Exception as e:
             logger.error(f"Erreur envoi musique: {e}")
@@ -406,11 +406,11 @@ class MasterAI:
     def process_message(self, user_id, message_text, chat_type="private"):
         """Traite les messages avec l'IA"""
         if not Config.GROQ_API_KEY:
-            return "🤖 Le système IA est en maintenance. Réessayez plus tard."
+            return "🤖 Le système IA est en maintenance. Réessayez plus tard.\n\n_Créé par Kervens King_"
         
         # Vérifier la limitation de requêtes
         if not AntiBugSystem.rate_limit(user_id, "ai_request", limit=10, window=60):
-            return "⏰ Trop de requêtes ! Attendez 1 minute."
+            return "⏰ Trop de requêtes ! Attendez 1 minute.\n\n_Créé par Kervens King_"
         
         personality = self.get_user_personality(user_id)
         system_prompt = PersonalitySystem.get_personality_prompt(personality, chat_type)
@@ -439,11 +439,11 @@ class MasterAI:
                 self.db.increment_message_count(user_id)
                 return ai_response
             else:
-                return "❌ Erreur de connexion IA. Réessayez."
+                return "❌ Erreur de connexion IA. Réessayez.\n\n_Créé par Kervens King_"
                 
         except Exception as e:
             logger.error(f"Erreur API IA: {e}")
-            return "❌ Erreur temporaire. Réessayez."
+            return "❌ Erreur temporaire. Réessayez.\n\n_Créé par Kervens King_"
 
 # ==================== INTERFACES MAÎTRE ====================
 class MasterInterface:
@@ -566,7 +566,7 @@ def start_command(message):
         # Enregistrer l'utilisateur ou le groupe
         if message.chat.type in ['group', 'supergroup']:
             db.add_group(message.chat.id, message.chat.title)
-            bot.reply_to(message, "👥 NovaAI activé dans ce groupe ! Utilisez /help pour les commandes.")
+            bot.reply_to(message, "👥 NovaAI activé dans ce groupe ! Utilisez /help pour les commandes.\n\n_Créé par Kervens King_")
             return
         
         # Enregistrer l'utilisateur
@@ -580,10 +580,11 @@ def start_command(message):
         # Message spécial pour le maître
         if AuthSystem.is_master(user_id):
             stats = db.get_master_stats()
-            welcome_text = f"""👑 <b>BIENVENUE MAÎTRE SUPRÊME !</b>
+            welcome_text = f"""👑 <b>BIENVENUE MAÎTRE SUPRÊME KERVENS KING !</b>
 
 🤖 <b>NovaAI Master Control</b>
 🎭 Personnalité: {personality_config['name']}
+👑 Créateur: Kervens King
 
 📊 <b>Votre Empire:</b>
 • 👥 {stats['total_users']} Utilisateurs
@@ -606,6 +607,7 @@ def start_command(message):
 
 {personality_config['emoji']} <b>{personality_config['name']}</b>
 ✨ {personality_config['style']}
+👑 Créé par <b>Kervens King</b>
 
 💬 <b>Parlez-moi de tout !</b>
 🎭 <b>Changez de personnalité selon votre humeur</b>"""
@@ -619,17 +621,17 @@ def start_command(message):
             
     except Exception as e:
         logger.error(f"Erreur start: {e}")
-        bot.reply_to(message, "❌ Erreur d'initialisation. Réessayez.")
+        bot.reply_to(message, "❌ Erreur d'initialisation. Réessayez.\n\n_Créé par Kervens King_")
 
 # ==================== COMMANDES DE CONTRÔLE MAÎTRE ====================
 @bot.message_handler(commands=['master', 'admin', 'control'])
 def master_command(message):
     if not AuthSystem.is_master(message.from_user.id):
-        bot.reply_to(message, "🚫 <b>Accès réservé au Maître Suprême</b>")
+        bot.reply_to(message, "🚫 <b>Accès réservé au Maître Suprême Kervens King</b>")
         return
     
     stats = db.get_master_stats()
-    master_text = f"""👑 <b>PANEL DE CONTRÔLE MAÎTRE</b>
+    master_text = f"""👑 <b>PANEL DE CONTRÔLE MAÎTRE - KERVENS KING</b>
 
 ⚡ <b>Commandes Disponibles:</b>
 
@@ -663,15 +665,16 @@ def stats_command(message):
 👥 <b>Groupes:</b> {stats['total_groups']}
 💬 <b>Messages:</b> {stats['total_messages']}
 
-⚡ <b>Système:</b> 🟢 Opérationnel"""
+⚡ <b>Système:</b> 🟢 Opérationnel
+👑 <b>Créateur:</b> Kervens King"""
     else:
         personality = ai_engine.get_user_personality(user_id)
         if personality == "amour":
-            stats_text = f"📊 <b>Notre Communauté</b>\n\n👥 Utilisateurs: {stats['total_users']}\n💬 Messages: {stats['total_messages']}"
+            stats_text = f"📊 <b>Notre Communauté</b>\n\n👥 Utilisateurs: {stats['total_users']}\n💬 Messages: {stats['total_messages']}\n\n👑 Créé par Kervens King"
         elif personality == "mysterieux":
-            stats_text = f"📊 <b>Énergies Collectives</b>\n\n👥 Âmes: {stats['total_users']}\n💬 Révélations: {stats['total_messages']}"
+            stats_text = f"📊 <b>Énergies Collectives</b>\n\n👥 Âmes: {stats['total_users']}\n💬 Révélations: {stats['total_messages']}\n\n👑 Créé par Kervens King"
         else:
-            stats_text = f"📊 <b>Système NovaAI</b>\n\n👥 Utilisateurs: {stats['total_users']}\n💬 Requêtes: {stats['total_messages']}"
+            stats_text = f"📊 <b>Système NovaAI</b>\n\n👥 Utilisateurs: {stats['total_users']}\n💬 Requêtes: {stats['total_messages']}\n\n👑 Créé par Kervens King"
     
     bot.reply_to(message, stats_text)
 
@@ -692,7 +695,7 @@ def broadcast_command(message):
     # Envoyer aux utilisateurs
     for user in users:
         try:
-            bot.send_message(user[0], f"📢 <b>Message du Maître:</b>\n\n{broadcast_text}")
+            bot.send_message(user[0], f"📢 <b>Message du Maître Kervens King:</b>\n\n{broadcast_text}")
             total_sent += 1
             time.sleep(0.1)  # Anti-spam
         except:
@@ -701,7 +704,7 @@ def broadcast_command(message):
     # Envoyer aux groupes
     for group in groups:
         try:
-            bot.send_message(group[0], f"📢 <b>Annonce NovaAI:</b>\n\n{broadcast_text}")
+            bot.send_message(group[0], f"📢 <b>Annonce NovaAI:</b>\n\n{broadcast_text}\n\n_Créé par Kervens King_")
             total_sent += 1
             time.sleep(0.1)
         except:
@@ -740,7 +743,7 @@ def ban_command(message):
 # ==================== COMMANDES UTILISATEURS ====================
 @bot.message_handler(commands=['help', 'aide'])
 def help_command(message):
-    help_text = """🤖 <b>Commandes NovaAI</b>
+    help_text = """🤖 <b>Commandes NovaAI - Créé par Kervens King</b>
 
 • <code>/start</code> - Démarrer le bot
 • <code>/help</code> - Afficher cette aide
@@ -754,7 +757,9 @@ def help_command(message):
 • 🔮 Mystérieux - Énigmatique et profond
 • 💻 Hacker - Technique et direct
 
-<b>Utilisez les boutons pour une navigation facile !</b>"""
+<b>Utilisez les boutons pour une navigation facile !</b>
+
+👑 <b>Créateur:</b> Kervens King"""
     
     bot.reply_to(message, help_text)
 
@@ -781,6 +786,7 @@ def callback_handler(call):
     try:
         user_id = call.from_user.id
         chat_id = call.message.chat.id
+        message_id = call.message.message_id
         
         # Répondre immédiatement
         bot.answer_callback_query(call.id, "⚡")
@@ -791,15 +797,24 @@ def callback_handler(call):
             if db.set_personality(user_id, personality):
                 personality_config = PersonalitySystem.get_personality_config(personality)
                 
+                # Modifier le message existant
+                try:
+                    bot.edit_message_caption(
+                        chat_id=chat_id,
+                        message_id=message_id,
+                        caption=f"✅ <b>Personnalité changée !</b>\n\n{personality_config['emoji']} <b>{personality_config['name']}</b>\n✨ {personality_config['style']}\n\n👑 Créé par Kervens King",
+                        reply_markup=MasterInterface.create_main_menu(personality)
+                    )
+                except:
+                    # Si l'édition échoue, envoyer un nouveau message
+                    bot.send_message(
+                        chat_id,
+                        f"✅ <b>Personnalité changée !</b>\n\n{personality_config['emoji']} <b>{personality_config['name']}</b>\n✨ {personality_config['style']}\n\n👑 Créé par Kervens King",
+                        reply_markup=MasterInterface.create_main_menu(personality)
+                    )
+                
                 # Envoyer la musique de la nouvelle personnalité
                 ai_engine.send_music(chat_id, personality)
-                
-                # Nouveau message de confirmation
-                bot.send_message(
-                    chat_id,
-                    f"✅ <b>Personnalité changée !</b>\n\n{personality_config['emoji']} <b>{personality_config['name']}</b>\n✨ {personality_config['style']}",
-                    reply_markup=MasterInterface.create_main_menu(personality)
-                )
         
         # ========== MUSIQUE ==========
         elif call.data == "music":
@@ -823,22 +838,40 @@ def callback_handler(call):
 💎 Premium: {stats['premium_users']}
 🚫 Bannis: {stats['banned_users']}
 👥 Groupes: {stats['total_groups']}
-💬 Messages: {stats['total_messages']}"""
+💬 Messages: {stats['total_messages']}
+
+👑 Créateur: Kervens King"""
             else:
                 if personality == "amour":
-                    stats_text = f"📊 <b>Notre Communauté</b>\n\n👥 {stats['total_users']} membres\n💬 {stats['total_messages']} messages"
+                    stats_text = f"📊 <b>Notre Communauté</b>\n\n👥 {stats['total_users']} membres\n💬 {stats['total_messages']} messages\n\n👑 Créé par Kervens King"
                 elif personality == "mysterieux":
-                    stats_text = f"📊 <b>Énergies</b>\n\n👥 {stats['total_users']} âmes\n💬 {stats['total_messages']} révélations"
+                    stats_text = f"📊 <b>Énergies</b>\n\n👥 {stats['total_users']} âmes\n💬 {stats['total_messages']} révélations\n\n👑 Créé par Kervens King"
                 else:
-                    stats_text = f"📊 <b>Système</b>\n\n👥 {stats['total_users']} users\n💬 {stats['total_messages']} requests"
+                    stats_text = f"📊 <b>Système</b>\n\n👥 {stats['total_users']} users\n💬 {stats['total_messages']} requests\n\n👑 Créé par Kervens King"
             
-            bot.send_message(chat_id, stats_text, 
-                           reply_markup=MasterInterface.create_main_menu(personality))
+            try:
+                bot.edit_message_caption(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    caption=stats_text,
+                    reply_markup=MasterInterface.create_main_menu(personality)
+                )
+            except:
+                bot.send_message(chat_id, stats_text, 
+                               reply_markup=MasterInterface.create_main_menu(personality))
         
         # ========== CHANGER PERSONNALITÉ ==========
         elif call.data == "change_personality":
-            bot.send_message(chat_id, "🎭 <b>Choisissez votre personnalité:</b>", 
-                           reply_markup=PersonalitySystem.get_personality_keyboard())
+            try:
+                bot.edit_message_caption(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    caption="🎭 <b>Choisissez votre personnalité:</b>\n\n👑 Créé par Kervens King",
+                    reply_markup=PersonalitySystem.get_personality_keyboard()
+                )
+            except:
+                bot.send_message(chat_id, "🎭 <b>Choisissez votre personnalité:</b>\n\n👑 Créé par Kervens King", 
+                               reply_markup=PersonalitySystem.get_personality_keyboard())
         
         # ========== COMMANDES MAÎTRE ==========
         elif call.data == "master_stats":
@@ -852,8 +885,17 @@ def callback_handler(call):
 👥 <b>Groupes:</b> {stats['total_groups']}
 💬 <b>Messages:</b> {stats['total_messages']}
 
-⚡ <b>Système:</b> 🟢 Optimal"""
-                bot.send_message(chat_id, stats_text, reply_markup=MasterInterface.create_master_menu())
+⚡ <b>Système:</b> 🟢 Optimal
+👑 <b>Créateur:</b> Kervens King"""
+                try:
+                    bot.edit_message_caption(
+                        chat_id=chat_id,
+                        message_id=message_id,
+                        caption=stats_text,
+                        reply_markup=MasterInterface.create_master_menu()
+                    )
+                except:
+                    bot.send_message(chat_id, stats_text, reply_markup=MasterInterface.create_master_menu())
         
         elif call.data == "master_users":
             if AuthSystem.is_master(user_id):
@@ -864,7 +906,17 @@ def callback_handler(call):
                     banned = "🚫" if user[4] else "✅"
                     users_text += f"{status}{banned} {user[2]} - {user[5]} msgs\n"
                 
-                bot.send_message(chat_id, users_text, reply_markup=MasterInterface.create_master_menu())
+                users_text += f"\n👑 Créé par Kervens King"
+                
+                try:
+                    bot.edit_message_caption(
+                        chat_id=chat_id,
+                        message_id=message_id,
+                        caption=users_text,
+                        reply_markup=MasterInterface.create_master_menu()
+                    )
+                except:
+                    bot.send_message(chat_id, users_text, reply_markup=MasterInterface.create_master_menu())
         
         # ========== INFO PREMIUM ==========
         elif call.data == "premium_info":
@@ -876,11 +928,21 @@ def callback_handler(call):
 • Fonctions avancées
 • Support personnalisé
 
-📩 <b>Contactez le maître:</b> @Soszoe"""
+📩 <b>Contactez le maître:</b> @Soszoe
+
+👑 <b>Créé par Kervens King</b>"""
             
             personality = ai_engine.get_user_personality(user_id)
-            bot.send_message(chat_id, premium_text, 
-                           reply_markup=MasterInterface.create_main_menu(personality))
+            try:
+                bot.edit_message_caption(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    caption=premium_text,
+                    reply_markup=MasterInterface.create_main_menu(personality)
+                )
+            except:
+                bot.send_message(chat_id, premium_text, 
+                               reply_markup=MasterInterface.create_main_menu(personality))
                 
     except Exception as e:
         logger.error(f"Erreur callback: {e}")
@@ -902,12 +964,13 @@ def handle_message(message):
         
         # Vérifier si banni
         if AuthSystem.is_banned(user_id):
+            bot.reply_to(message, "🚫 Vous êtes banni de ce bot.")
             return
         
         # Gestion des groupes
         if message.chat.type in ['group', 'supergroup']:
             # Répondre seulement si le bot est mentionné ou en réponse
-            if bot.get_me().username in message_text or message.reply_to_message:
+            if f"@{bot.get_me().username}" in message_text or message.reply_to_message:
                 db.add_group(chat_id, message.chat.title)
                 bot.send_chat_action(chat_id, 'typing')
                 time.sleep(1)
@@ -921,7 +984,7 @@ def handle_message(message):
         
         # Vérifier la limitation
         if not AntiBugSystem.rate_limit(user_id, "message", limit=15, window=60):
-            bot.reply_to(message, "⏰ <b>Trop de messages !</b> Attendez 1 minute.")
+            bot.reply_to(message, "⏰ <b>Trop de messages !</b> Attendez 1 minute.\n\n👑 Créé par Kervens King")
             return
         
         # Typing indicator
@@ -952,7 +1015,7 @@ def handle_message(message):
     except Exception as e:
         logger.error(f"Erreur message: {e}")
         try:
-            bot.reply_to(message, "❌ <b>Erreur de traitement.</b> Réessayez.")
+            bot.reply_to(message, "❌ <b>Erreur de traitement.</b> Réessayez.\n\n👑 Créé par Kervens King")
         except:
             pass
 
@@ -965,6 +1028,7 @@ if __name__ == "__main__":
 🎵 Voice Messages Réels
 👥 Gestion Groupes/Chaines
 🛡️ Système de Sécurité Renforcé
+👑 Créé par Kervens King
 
 🟢 EN LIGNE - Prêt à obéir au Maître !
     """)
